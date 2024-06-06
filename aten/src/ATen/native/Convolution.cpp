@@ -82,6 +82,7 @@
 #include <ATen/ops/view_as_real.h>
 #include <ATen/ops/zeros.h>
 #include <ATen/ops/zeros_like.h>
+#include <iostream>
 #endif
 
 constexpr int MIOPEN_DIM_MAX = 5;
@@ -1173,6 +1174,7 @@ at::Tensor convolution(
   c10::MaybeOwned<Tensor> bias_maybe_owned = at::borrow_from_optional_tensor(bias_opt);
   const Tensor& bias = *bias_maybe_owned;
 
+  std::cout << "HELLO FROM SOURCE" << std::endl;
   auto& ctx = at::globalContext();
   // See Note [Enabling Deterministic Operations]
   bool deterministic = ctx.deterministicCuDNN() || ctx.deterministicAlgorithms();
