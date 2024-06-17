@@ -1174,7 +1174,7 @@ at::Tensor convolution(
   c10::MaybeOwned<Tensor> bias_maybe_owned = at::borrow_from_optional_tensor(bias_opt);
   const Tensor& bias = *bias_maybe_owned;
 
-  std::cout << "HELLO FROM SOURCE" << std::endl;
+  // std::cout << "Size in convolution.cpp " << std::endl << input.sizes() << std::endl << std::endl;
   auto& ctx = at::globalContext();
   // See Note [Enabling Deterministic Operations]
   bool deterministic = ctx.deterministicCuDNN() || ctx.deterministicAlgorithms();
@@ -1356,7 +1356,6 @@ static ConvBackend select_conv_backend(
     const ConvParams<int64_t>& params) {
   return _select_conv_backend(input, weight, {}, bias_sizes_opt, need_backward, params);
 }
-
 static at::Tensor _convolution_nogroup_backend(
     const Tensor& input,
     const Tensor& weight,
@@ -1372,6 +1371,7 @@ static at::Tensor _convolution_nogroup_backend(
       TORCH_INTERNAL_ASSERT(false, "NnpackSpatial backend was selected in PyTorch compiled without nnpack support");
 #endif
     case ConvBackend::Slow2d:
+      // std::cout << "HELLO FROM final function slow2d?" << std::endl;
       return at::thnn_conv2d(input, weight, kernel_size, bias, params.stride, params.padding);
     case ConvBackend::SlowDilated2d:
       return at::slow_conv_dilated2d(
@@ -1471,6 +1471,7 @@ at::Tensor _convolution(
   c10::MaybeOwned<Tensor> bias_r_maybe_owned = at::borrow_from_optional_tensor(bias_r_opt);
   const Tensor& bias_r = *bias_r_maybe_owned;
 
+  // std::cout << "HELLO FROM _convolution" << std::endl;
   auto input = input_r;
   auto weight = weight_r;
   auto bias = bias_r;
@@ -1505,6 +1506,7 @@ at::Tensor _convolution(
     weight = view4d(weight);
   }
 
+
   // Select appropriate backend to use.
   auto bias_sizes_opt = bias.defined() ? std::optional<IntArrayRef>(bias.sizes()) : c10::nullopt;
   bool need_backward = GradMode::is_enabled() &&
@@ -1512,7 +1514,81 @@ at::Tensor _convolution(
   ConvBackend backend = _select_conv_backend(input, weight, bias, c10::OptionalIntArrayRef(bias_sizes_opt), need_backward, params);
   at::MemoryFormat backend_memory_format = determine_backend_memory_format(input, weight, backend);
 
-  // Call the backend.
+  //printing convbackend
+  switch (backend) {
+    case ConvBackend::CudaDepthwise2d: 
+        std::cout << "CudaDepthwise2d" << std::endl;
+        break;
+    case ConvBackend::CudaDepthwise3d: 
+        std::cout << "CudaDepthwise3d" << std::endl;
+        break;
+    case ConvBackend::Cudnn: 
+        std::cout << "Cudnn" << std::endl;
+        break;
+    case ConvBackend::CudnnTranspose: 
+        std::cout << "CudnnTranspose" << std::endl;
+        break;
+    case ConvBackend::Empty: 
+        std::cout << "Empty" << std::endl;
+        break;
+    case ConvBackend::Miopen: 
+        std::cout << "Miopen" << std::endl;
+        break;
+    case ConvBackend::MiopenDepthwise: 
+        std::cout << "MiopenDepthwise" << std::endl;
+        break;
+    case ConvBackend::MiopenTranspose: 
+        std::cout << "MiopenTranspose" << std::endl;
+        break;
+    case ConvBackend::Mkldnn: 
+        std::cout << "Mkldnn" << std::endl;
+        break;
+    case ConvBackend::MkldnnTranspose: 
+        std::cout << "MkldnnTranspose" << std::endl;
+        break;
+    case ConvBackend::MkldnnEmpty: 
+        std::cout << "MkldnnEmpty" << std::endl;
+        break;
+    case ConvBackend::Overrideable: 
+        std::cout << "Overrideable" << std::endl;
+        break;
+    case ConvBackend::Slow3d: 
+        std::cout << "Slow3d" << std::endl;
+        break;
+    case ConvBackend::Winograd3x3Depthwise: 
+        std::cout << "Winograd3x3Depthwise" << std::endl;
+        break;
+    case ConvBackend::Xnnpack2d: 
+        std::cout << "Xnnpack2d" << std::endl;
+        break;
+    case ConvBackend::NnpackSpatial: 
+        std::cout << "NnpackSpatial" << std::endl;
+        break;
+    case ConvBackend::Slow2d: 
+        std::cout << "Slow2d" << std::endl;
+        break;
+    case ConvBackend::SlowDilated2d: 
+        std::cout << "SlowDilated2d" << std::endl;
+        break;
+    case ConvBackend::SlowDilated3d: 
+        std::cout << "SlowDilated3d" << std::endl;
+        break;
+    case ConvBackend::SlowTranspose2d: 
+        std::cout << "SlowTranspose2d" << std::endl;
+        break;
+    case ConvBackend::SlowTranspose3d: 
+        std::cout << "SlowTranspose3d" << std::endl;
+        break;
+    case ConvBackend::Mps: 
+        std::cout << "Mps" << std::endl;
+        break;
+    case ConvBackend::MpsTranspose: 
+        std::cout << "MpsTranspose" << std::endl;
+        break;
+    default: 
+        std::cout << "Unsupported conv nogroup backend encountered" << std::endl;
+        break;
+  }
   Tensor output;
   auto kernel_size = weight.sizes().slice(2);
   switch (backend) {
@@ -1647,7 +1723,7 @@ at::Tensor _convolution(
       weight = weight.contiguous(backend_memory_format);
       if (params.groups == 1) {
         output = _convolution_nogroup_backend(input, weight, bias, backend, params);
-      } else {
+      } else { 
         std::vector<Tensor> outputs(params.groups);
         for (const auto g : c10::irange(params.groups)) {
           auto input_g = subtensor(input, 1, params.groups, g);

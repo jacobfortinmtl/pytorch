@@ -3,7 +3,7 @@
 #include <ATen/native/mkl/LinearAlgebra.h>
 #include <ATen/native/mkldnn/Matmul.h>
 #include <ATen/Config.h>
-
+#include <iostream>
 #include <c10/util/SmallBuffer.h>
 #include <c10/util/irange.h>
 
@@ -164,6 +164,12 @@ void gemm(
     const float beta,
     float *c, int64_t ldc) {
   internal::normalize_last_dims(transa, transb, m, n, k, &lda, &ldb, &ldc);
+
+  // Print the shapes of the input matrices
+  std::cout << "Size in CPUBLAS.cpp: " << std::endl;
+  std::cout << "Matrix A shape: (" << m << ", " << k << ")" << std::endl;
+  std::cout << "Matrix B shape: (" << k << ", " << n << ")" << std::endl;
+  std::cout << "Matrix C shape: (" << m << ", " << n << ")" << std::endl;
 #if AT_MKLDNN_ENABLED()
    if (mkldnn_bf32_gemm(transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)) {
      return;
@@ -186,6 +192,8 @@ void gemm(
       c, ldc_);
     #else
     char transa_ = to_blas(transa), transb_ = to_blas(transb);
+    //print the contents of a, b
+    preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, a, &lda_, b, &ldb_, &beta_, c, &ldc_);
     sgemm_(
         &transa_, &transb_,
         &m_, &n_, &k_,
@@ -202,6 +210,49 @@ void gemm(
       at::kCPU, at::kFloat,
       transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
 }
+
+// The function take similar arguments as the sgemm_ function but restructures the output to remove the rows
+// With NaNs and collapse the matrix into a smaller/denser matrix.
+// It takes as input pointers to the matrices A, B, and C, and the dimensions of the matrices
+// transa and transb: These are characters that specify whether matrices A and B are to be transposed. 'N' for no transpose, 'T' for transpose, and 'C' for conjugate transpose.
+// m and n: These are the dimensions of the matrices. m is the number of rows and n is the number of columns.
+// k: This is the common dimension for the multiplication. If A and B are the matrices being multiplied, then A has dimensions m x k and B has dimensions k x n.
+// alpha: This is a scalar multiplier for the product of matrices A and B.
+// a and b: These are the matrices being multiplied.
+// lda and ldb: These are the leading dimensions of the matrices A and B. 
+// The leading dimension is essentially the size of the memory storage of the matrix.
+// beta: This is a scalar multiplier for matrix C.
+// c: This is the resultant matrix after the multiplication.
+// ldc: This is the leading dimension of matrix C.
+
+void preprocessing(
+    char* transa, char* transb, int* m, int* n, int* k, 
+    float* alpha, const float* a, int* lda, const float* b, int* ldb, 
+    float* beta, float* c, int* ldc) 
+{
+    std::cout << std::endl;
+    std::cout << "Inside pre-processing: " << std::endl;  
+    std::cout << "Matrix A (shape " << *m << ", " << *k << "):" << std::endl;
+    std::cout << "Value of lda: " << *lda << std::endl;
+
+    // in example with A = (9,4), B = (4, 1), C = (9, 1)
+    for (int i = 0; i < *m; i++) { //m = num rows A = 9
+        for (int j = 0; j < *k; j++) { //k = common dimension = 4
+            int index = j * *lda + i;
+            std::cout << a[index] << " ";
+        }
+        std::cout << std::endl;
+    } 
+    std::cout << std::endl; 
+
+    std::cout << std::endl;
+    std::cout << "Printing all elements contiguously to see the layout of the matrix" << std::endl;
+    for (int i = 0; i < *k * *lda; i++) {
+        std::cout << a[i] << " ";
+    }
+    std::cout << std::endl;
+}
+
 
 void gemm(
     TransposeType transa, TransposeType transb,

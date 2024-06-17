@@ -20,6 +20,7 @@
 #include <ATen/ops/sum.h>
 #include <ATen/ops/thnn_conv2d_native.h>
 #endif
+#include <iostream>
 
 namespace at::native {
 
@@ -63,7 +64,7 @@ static Tensor compute_columns2d(
     AT_DISPATCH_ALL_TYPES_AND2(kBFloat16, kHalf, input.scalar_type(), "slow_conv2d_cpu", [&]{
       auto input_a = input.accessor<const scalar_t, 4>();
       auto columns_a = columns.accessor<scalar_t, 3>();
-
+      // std::cout << "Size in compute_columns2d " << std::endl;
       at::parallel_for(0, batch_size, 0, [&](int64_t start, int64_t end) {
         for (const auto t : c10::irange(start, end)) {
           auto input_t = input_a[t];
@@ -270,6 +271,13 @@ static void slow_conv2d_update_output_frame(
     const int64_t ldb = k;
     const int64_t ldc = m;
 
+    // std::cout << "Size in convolutionMM2d.cpp " << std::endl;
+     // Print the shape of the input tensor
+    // std::cout << "Input shape: ("
+              // << input.size(0) << ", "
+              // << input.size(1) << ", "
+              // << input.size(2) << ")"
+              // << std::endl << std::endl;
     at::native::cpublas::gemm(
         TransposeType::NoTranspose,
         TransposeType::NoTranspose,
@@ -591,7 +599,6 @@ Tensor& slow_conv2d_forward_out_cpu(
     output.copy_(bias.reshape({-1, 1, 1}));
   }
   TORCH_CHECK(output.is_contiguous(memory_format), "slow_conv2d output tensor must be contiguous");
-
   AT_DISPATCH_ALL_TYPES_AND2(kBFloat16, kHalf, input.scalar_type(), "slow_conv2d_cpu", [&]{
     auto input_a = input.accessor<const scalar_t, 4>();
     auto output_a = output.accessor<scalar_t, 4>();
@@ -625,7 +632,6 @@ Tensor& slow_conv2d_forward_out_cpu(
       }
     });
   });
-
   return output;
 }
 
