@@ -1,11 +1,44 @@
 #define TORCH_ASSERT_ONLY_METHOD_OPERATORS
+#include <ATen/core/Tensor.h>
+#include <ATen/Dispatch.h>
+#include <ATen/NamedTensorUtils.h>
+#include <ATen/ScalarOps.h>
+#include <ATen/TensorIndexing.h>
+#include <ATen/TensorMeta.h>
+#include <ATen/TensorOperators.h>
+#include <ATen/WrapDimUtils.h>
+#include <ATen/native/BinaryOps.h>
+#include <ATen/native/ReduceOpsUtils.h>
+#include <ATen/native/Resize.h>
+#include <ATen/native/TensorCompare.h>
+#include <ATen/native/TypeProperties.h>
+#include <ATen/TensorSubclassLikeUtils.h>
+#include <iostream>
+#include <c10/util/Exception.h>
 #include <ATen/native/CPUBlas.h>
+#include <ATen/ops/from_blob.h>
+#include <ATen/ops/isnan_native.h>
+#include <ATen/TensorIndexing.h>
+#include <ATen/TensorOperators.h>
+#include <ATen/ops/index.h>
 #include <ATen/native/mkl/LinearAlgebra.h>
 #include <ATen/native/mkldnn/Matmul.h>
 #include <ATen/Config.h>
 #include <iostream>
 #include <c10/util/SmallBuffer.h>
 #include <c10/util/irange.h>
+#include <ATen/ops/slice.h>
+#include <ATen/ops/slice_backward_native.h>
+#include <ATen/ops/slice_copy_native.h>
+#include <ATen/ops/slice_inverse_native.h>
+#include <ATen/ops/slice_native.h>
+#include <ATen/ops/slice_scatter_native.h>
+#include <ATen/Tensor.h>
+#include <ATen/native/TensorAdvancedIndexing.h>
+#include <ATen/native/IndexKernel.h>
+#include <ATen/native/IndexingUtils.h>
+
+
 
 #include <climits>
 
@@ -211,19 +244,32 @@ void gemm(
       transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
 }
 
-// The function take similar arguments as the sgemm_ function but restructures the output to remove the rows
-// With NaNs and collapse the matrix into a smaller/denser matrix.
-// It takes as input pointers to the matrices A, B, and C, and the dimensions of the matrices
-// transa and transb: These are characters that specify whether matrices A and B are to be transposed. 'N' for no transpose, 'T' for transpose, and 'C' for conjugate transpose.
-// m and n: These are the dimensions of the matrices. m is the number of rows and n is the number of columns.
-// k: This is the common dimension for the multiplication. If A and B are the matrices being multiplied, then A has dimensions m x k and B has dimensions k x n.
-// alpha: This is a scalar multiplier for the product of matrices A and B.
-// a and b: These are the matrices being multiplied.
-// lda and ldb: These are the leading dimensions of the matrices A and B. 
-// The leading dimension is essentially the size of the memory storage of the matrix.
-// beta: This is a scalar multiplier for matrix C.
-// c: This is the resultant matrix after the multiplication.
-// ldc: This is the leading dimension of matrix C.
+// The function takes similar arguments as the sgemm_ function but restructures the output
+// to remove rows with NaNs and collapse the matrix into a smaller, denser matrix.
+// It takes as input pointers to matrices A, B, and C, and the dimensions of the matrices.
+
+// transa and transb: Characters specifying whether matrices A and B are to be transposed.
+//                   'N' for no transpose, 'T' for transpose, 'C' for conjugate transpose.
+
+// m and n: Dimensions of the matrices. 
+//          m is the number of rows, n is the number of columns.
+
+// k: Common dimension for the multiplication.
+//    If A and B are the matrices being multiplied, A has dimensions m x k and B has dimensions k x n.
+
+// alpha: Scalar multiplier for the product of matrices A and B.
+
+// a and b: Pointers to the matrices being multiplied.
+
+// lda and ldb: Leading dimensions of matrices A and B. 
+//             The leading dimension is the size of the memory storage of the matrix.
+
+// beta: Scalar multiplier for matrix C.
+
+// c: Pointer to the resultant matrix after multiplication.
+
+// ldc: Leading dimension of matrix C.
+
 
 void preprocessing(
     char* transa, char* transb, int* m, int* n, int* k, 
@@ -235,15 +281,23 @@ void preprocessing(
     std::cout << "Matrix A (shape " << *m << ", " << *k << "):" << std::endl;
     std::cout << "Value of lda: " << *lda << std::endl;
 
-    // in example with A = (9,4), B = (4, 1), C = (9, 1)
-    for (int i = 0; i < *m; i++) { //m = num rows A = 9
-        for (int j = 0; j < *k; j++) { //k = common dimension = 4
-            int index = j * *lda + i;
-            std::cout << a[index] << " ";
-        }
-        std::cout << std::endl;
-    } 
-    std::cout << std::endl; 
+    // Converting the matrix A to a tensor
+    // Need to switch both k and m since fortran expects column-major order
+    // Whereas C++ is row-major order. A was stored in column-major order, so to do modifications
+    // we will need to switch the dimensions.
+    auto A_tensor = from_blob((void*)a, {*k, *m}, at::kFloat);
+
+    // Printing the matrix A
+    // std::cout << "Matrix A: " << std::endl;
+    // std::cout << A_tensor << std::endl;
+    
+
+    // Method 1 - Using torch functions to filter the columns with NaNs
+    auto A_tensor_mask = (isnan(A_tensor).sum(0) < 5); // TODO CHANGE THE SIGN WHEN DONE TESTING BECAUSE THIS WILL KEEP LESS THAN 5
+    auto filtered_A_tensor = A_tensor.index({at::indexing::Slice(), A_tensor_mask}); // filters the columns with more than 5 NaNs
+    std::cout << "Filtered A tensor: " << std::endl;
+    std::cout << filtered_A_tensor << std::endl;
+
 
     std::cout << std::endl;
     std::cout << "Printing all elements contiguously to see the layout of the matrix" << std::endl;

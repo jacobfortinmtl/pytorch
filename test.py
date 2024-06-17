@@ -16,7 +16,7 @@ print(input_tensor)
 print()
 
 # Create a random weights tensor of integers
-weight = torch.ones(1, 1, 2, 2)  # generates integers between -10 and 9
+weight = torch.ones(1, 1, 2, 2)
 
 # Convert the integer tensor to float
 weight = weight.float()
