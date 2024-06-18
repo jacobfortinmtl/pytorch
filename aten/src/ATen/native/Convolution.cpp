@@ -1514,81 +1514,81 @@ at::Tensor _convolution(
   ConvBackend backend = _select_conv_backend(input, weight, bias, c10::OptionalIntArrayRef(bias_sizes_opt), need_backward, params);
   at::MemoryFormat backend_memory_format = determine_backend_memory_format(input, weight, backend);
 
-  //printing convbackend
-  switch (backend) {
-    case ConvBackend::CudaDepthwise2d: 
-        std::cout << "CudaDepthwise2d" << std::endl;
-        break;
-    case ConvBackend::CudaDepthwise3d: 
-        std::cout << "CudaDepthwise3d" << std::endl;
-        break;
-    case ConvBackend::Cudnn: 
-        std::cout << "Cudnn" << std::endl;
-        break;
-    case ConvBackend::CudnnTranspose: 
-        std::cout << "CudnnTranspose" << std::endl;
-        break;
-    case ConvBackend::Empty: 
-        std::cout << "Empty" << std::endl;
-        break;
-    case ConvBackend::Miopen: 
-        std::cout << "Miopen" << std::endl;
-        break;
-    case ConvBackend::MiopenDepthwise: 
-        std::cout << "MiopenDepthwise" << std::endl;
-        break;
-    case ConvBackend::MiopenTranspose: 
-        std::cout << "MiopenTranspose" << std::endl;
-        break;
-    case ConvBackend::Mkldnn: 
-        std::cout << "Mkldnn" << std::endl;
-        break;
-    case ConvBackend::MkldnnTranspose: 
-        std::cout << "MkldnnTranspose" << std::endl;
-        break;
-    case ConvBackend::MkldnnEmpty: 
-        std::cout << "MkldnnEmpty" << std::endl;
-        break;
-    case ConvBackend::Overrideable: 
-        std::cout << "Overrideable" << std::endl;
-        break;
-    case ConvBackend::Slow3d: 
-        std::cout << "Slow3d" << std::endl;
-        break;
-    case ConvBackend::Winograd3x3Depthwise: 
-        std::cout << "Winograd3x3Depthwise" << std::endl;
-        break;
-    case ConvBackend::Xnnpack2d: 
-        std::cout << "Xnnpack2d" << std::endl;
-        break;
-    case ConvBackend::NnpackSpatial: 
-        std::cout << "NnpackSpatial" << std::endl;
-        break;
-    case ConvBackend::Slow2d: 
-        std::cout << "Slow2d" << std::endl;
-        break;
-    case ConvBackend::SlowDilated2d: 
-        std::cout << "SlowDilated2d" << std::endl;
-        break;
-    case ConvBackend::SlowDilated3d: 
-        std::cout << "SlowDilated3d" << std::endl;
-        break;
-    case ConvBackend::SlowTranspose2d: 
-        std::cout << "SlowTranspose2d" << std::endl;
-        break;
-    case ConvBackend::SlowTranspose3d: 
-        std::cout << "SlowTranspose3d" << std::endl;
-        break;
-    case ConvBackend::Mps: 
-        std::cout << "Mps" << std::endl;
-        break;
-    case ConvBackend::MpsTranspose: 
-        std::cout << "MpsTranspose" << std::endl;
-        break;
-    default: 
-        std::cout << "Unsupported conv nogroup backend encountered" << std::endl;
-        break;
-  }
+  // //printing convbackend
+  // switch (backend) {
+  //   case ConvBackend::CudaDepthwise2d: 
+  //       std::cout << "CudaDepthwise2d" << std::endl;
+  //       break;
+  //   case ConvBackend::CudaDepthwise3d: 
+  //       std::cout << "CudaDepthwise3d" << std::endl;
+  //       break;
+  //   case ConvBackend::Cudnn: 
+  //       std::cout << "Cudnn" << std::endl;
+  //       break;
+  //   case ConvBackend::CudnnTranspose: 
+  //       std::cout << "CudnnTranspose" << std::endl;
+  //       break;
+  //   case ConvBackend::Empty: 
+  //       std::cout << "Empty" << std::endl;
+  //       break;
+  //   case ConvBackend::Miopen: 
+  //       std::cout << "Miopen" << std::endl;
+  //       break;
+  //   case ConvBackend::MiopenDepthwise: 
+  //       std::cout << "MiopenDepthwise" << std::endl;
+  //       break;
+  //   case ConvBackend::MiopenTranspose: 
+  //       std::cout << "MiopenTranspose" << std::endl;
+  //       break;
+  //   case ConvBackend::Mkldnn: 
+  //       std::cout << "Mkldnn" << std::endl;
+  //       break;
+  //   case ConvBackend::MkldnnTranspose: 
+  //       std::cout << "MkldnnTranspose" << std::endl;
+  //       break;
+  //   case ConvBackend::MkldnnEmpty: 
+  //       std::cout << "MkldnnEmpty" << std::endl;
+  //       break;
+  //   case ConvBackend::Overrideable: 
+  //       std::cout << "Overrideable" << std::endl;
+  //       break;
+  //   case ConvBackend::Slow3d: 
+  //       std::cout << "Slow3d" << std::endl;
+  //       break;
+  //   case ConvBackend::Winograd3x3Depthwise: 
+  //       std::cout << "Winograd3x3Depthwise" << std::endl;
+  //       break;
+  //   case ConvBackend::Xnnpack2d: 
+  //       std::cout << "Xnnpack2d" << std::endl;
+  //       break;
+  //   case ConvBackend::NnpackSpatial: 
+  //       std::cout << "NnpackSpatial" << std::endl;
+  //       break;
+  //   case ConvBackend::Slow2d: 
+  //       std::cout << "Slow2d" << std::endl;
+  //       break;
+  //   case ConvBackend::SlowDilated2d: 
+  //       std::cout << "SlowDilated2d" << std::endl;
+  //       break;
+  //   case ConvBackend::SlowDilated3d: 
+  //       std::cout << "SlowDilated3d" << std::endl;
+  //       break;
+  //   case ConvBackend::SlowTranspose2d: 
+  //       std::cout << "SlowTranspose2d" << std::endl;
+  //       break;
+  //   case ConvBackend::SlowTranspose3d: 
+  //       std::cout << "SlowTranspose3d" << std::endl;
+  //       break;
+  //   case ConvBackend::Mps: 
+  //       std::cout << "Mps" << std::endl;
+  //       break;
+  //   case ConvBackend::MpsTranspose: 
+  //       std::cout << "MpsTranspose" << std::endl;
+  //       break;
+  //   default: 
+  //       std::cout << "Unsupported conv nogroup backend encountered" << std::endl;
+  //       break;
+  // }
   Tensor output;
   auto kernel_size = weight.sizes().slice(2);
   switch (backend) {

@@ -1,15 +1,25 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 # Create a random input tensor
 
 # Setting the seed for reproducibility
 torch.manual_seed(42)
-# Create a random input tensor of integers
-input_tensor = torch.arange(1,17).reshape(1, 1, 4, 4)  # generates integers between 0 and 99
+size = 25
+# Determine how many elements should be NaN
+num_nans = size // 3
 
+# Create a random permutation of the indices
+indices = torch.randperm(size)
+input_tensor = torch.arange(1,26)  # generates integers between 1 and 81
 # Convert the integer tensor to float
 input_tensor = input_tensor.float()
+# Set the elements at the indices to NaN
+input_tensor[indices[:num_nans]] = float('nan')
+
+# Reshape the tensor back to its original shape
+input_tensor = input_tensor.reshape(1, 1, 5, 5)
 
 print("Input Tensor: ")
 print(input_tensor)

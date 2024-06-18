@@ -37,6 +37,8 @@
 #include <ATen/native/TensorAdvancedIndexing.h>
 #include <ATen/native/IndexKernel.h>
 #include <ATen/native/IndexingUtils.h>
+#include <algorithm>
+#include <vector>
 
 
 
@@ -199,10 +201,10 @@ void gemm(
   internal::normalize_last_dims(transa, transb, m, n, k, &lda, &ldb, &ldc);
 
   // Print the shapes of the input matrices
-  std::cout << "Size in CPUBLAS.cpp: " << std::endl;
-  std::cout << "Matrix A shape: (" << m << ", " << k << ")" << std::endl;
-  std::cout << "Matrix B shape: (" << k << ", " << n << ")" << std::endl;
-  std::cout << "Matrix C shape: (" << m << ", " << n << ")" << std::endl;
+  // std::cout << "Size in CPUBLAS.cpp: " << std::endl;
+  // std::cout << "Matrix A shape: (" << m << ", " << k << ")" << std::endl;
+  // std::cout << "Matrix B shape: (" << k << ", " << n << ")" << std::endl;
+  // std::cout << "Matrix C shape: (" << m << ", " << n << ")" << std::endl;
 #if AT_MKLDNN_ENABLED()
    if (mkldnn_bf32_gemm(transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)) {
      return;
@@ -225,7 +227,8 @@ void gemm(
       c, ldc_);
     #else
     char transa_ = to_blas(transa), transb_ = to_blas(transb);
-    //print the contents of a, b
+
+    // Custom pre-processing steps
     preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, a, &lda_, b, &ldb_, &beta_, c, &ldc_);
     sgemm_(
         &transa_, &transb_,
@@ -276,35 +279,55 @@ void preprocessing(
     float* alpha, const float* a, int* lda, const float* b, int* ldb, 
     float* beta, float* c, int* ldc) 
 {
-    std::cout << std::endl;
-    std::cout << "Inside pre-processing: " << std::endl;  
-    std::cout << "Matrix A (shape " << *m << ", " << *k << "):" << std::endl;
-    std::cout << "Value of lda: " << *lda << std::endl;
+    // Creating our vector of pointers that will point to each row of the matrix
+    // We will use this to remove rows with NaNs
+    std::vector<std::vector<const float*>> rows;
 
-    // Converting the matrix A to a tensor
-    // Need to switch both k and m since fortran expects column-major order
-    // Whereas C++ is row-major order. A was stored in column-major order, so to do modifications
-    // we will need to switch the dimensions.
-    auto A_tensor = from_blob((void*)a, {*k, *m}, at::kFloat);
-
-    // Printing the matrix A
-    // std::cout << "Matrix A: " << std::endl;
-    // std::cout << A_tensor << std::endl;
-    
-
-    // Method 1 - Using torch functions to filter the columns with NaNs
-    auto A_tensor_mask = (isnan(A_tensor).sum(0) < 5); // TODO CHANGE THE SIGN WHEN DONE TESTING BECAUSE THIS WILL KEEP LESS THAN 5
-    auto filtered_A_tensor = A_tensor.index({at::indexing::Slice(), A_tensor_mask}); // filters the columns with more than 5 NaNs
-    std::cout << "Filtered A tensor: " << std::endl;
-    std::cout << filtered_A_tensor << std::endl;
-
-
-    std::cout << std::endl;
-    std::cout << "Printing all elements contiguously to see the layout of the matrix" << std::endl;
-    for (int i = 0; i < *k * *lda; i++) {
-        std::cout << a[i] << " ";
+    // setting the elements of the array to point to the specific row
+    for (int i = 0; i < *m; i++) { //m = num rows in A
+        std::vector<const float*> row;
+        for (int j = 0; j < *k; j++) { //k = common dimension
+            int index = j * *lda + i;
+            row.push_back(&a[index]); 
+        }
+        rows.push_back(row);
     }
-    std::cout << std::endl;
+    std::vector<int> removed_indexes = {}; 
+    // counting the number of nans in each row and removes those that have nan above threshold
+    int threshold = 2;
+    int row_index = 0;
+    // using the erase-remove idiom to remove rows with nans
+    // marking the rows to remove
+    rows.erase(
+      std::remove_if(
+        rows.begin(),
+        rows.end(),
+        [&removed_indexes, &threshold, &row_index] (const auto& row) {
+            int nan_count = 0;
+            for (const auto& element: row) {
+                if (std::isnan(*element)) {
+                    nan_count++;
+                }
+            }
+            if (nan_count > threshold) {
+                removed_indexes.push_back(row_index);
+                row_index++;
+                return true;
+            }
+            row_index++;
+            return false;
+          }
+        ),
+      rows.end()
+    );
+    // Printing the contents of the loop
+    for (const auto& row: rows){
+        std::cout << "Row: ";
+        for (const auto& element: row){ 
+            std::cout << *element << " ";
+        }
+        std::cout << std::endl;
+    }
 }
 
 
