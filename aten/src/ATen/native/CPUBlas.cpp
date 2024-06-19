@@ -358,9 +358,8 @@ void preprocessing(
             new_c_ptr++;
         }
     }
-    // Resetting pointers for c
-    c = new_c;
-
+    // Copying over. Cant just change the pointer without changing a bunch of fct def
+    memcpy(c, new_c, sizeof(float) * (*ldc) * (*n));
     //Printing new C
     std::cout << std::endl;
     std::cout << "Printing updated NaN removed matrix C: " << std::endl;
@@ -372,6 +371,8 @@ void preprocessing(
         }
         std::cout << std::endl;
     }
+    delete[] new_a;
+    delete[] new_c;
     delete[] row_to_remove;
 }
 
