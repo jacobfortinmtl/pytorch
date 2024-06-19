@@ -188,7 +188,6 @@ void copy(int64_t n, const c10::complex<float> *x, int64_t incx, c10::complex<fl
 
 void preprocessing(
     char* transa, char* transb, int* m, int* n, int* k, 
-    float* alpha, const float* a, int* lda, const float* b, int* ldb, 
-    float* beta, float* c, int* ldc); 
-   
+    float* alpha, const float** a, int* lda, const float* b, int* ldb, 
+    float* beta, float** c, int* ldc); 
 }  // namespace at::native::cpublas
