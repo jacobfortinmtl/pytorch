@@ -229,7 +229,7 @@ void gemm(
     char transa_ = to_blas(transa), transb_ = to_blas(transb);
 
     // Custom pre-processing steps
-    preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, &a, &lda_, b, &ldb_, &beta_, &c, &ldc_);
+    preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, a, &lda_, b, &ldb_, &beta_, c, &ldc_);
     #endif
     return;
   }
@@ -268,8 +268,8 @@ void gemm(
 
 void preprocessing(
     char* transa, char* transb, int* m, int* n, int* k, 
-    float* alpha, const float** a, int* lda, const float* b, int* ldb, 
-    float* beta, float** c, int* ldc) 
+    float* alpha, const float* a, int* lda, const float* b, int* ldb, 
+    float* beta, float* c, int* ldc) 
 {
     int nan_threshold = 2; // having more NaNs than this will delete the row
     bool* row_to_remove = new bool[*m];
@@ -281,7 +281,7 @@ void preprocessing(
         int nan_count = 0;
         row_to_remove[i] = false;
         for (int j = 0; j < *k; ++j) {
-            if (std::isnan((*a)[j * (*lda) + i])) {
+            if (std::isnan(a[j * (*lda) + i])) {
                 nan_count++;
                 if (nan_count > nan_threshold) {
                     row_to_remove[i] = true;
@@ -302,40 +302,38 @@ void preprocessing(
         new_row = 0;
         for (int i = 0; i < *m; ++i) {
             if (!row_to_remove[i]) {
-                new_a[j * new_m + new_row] = (*a)[j * (*lda) + i];
+                new_a[j * new_m + new_row] = a[j * (*lda) + i];
                 new_row++;
             }
         }
     }
 
     // Setting the pointer of a to this new memory location and updating sizes
-    // delete[] *a; // Free the old memory
-    *a = new_a;
+    a = new_a;
     *m = new_m;
     *lda = new_m;
 
     std::cout << "Printing updated NaN removed matrix: " << std::endl;
-    // Printing the new a that is now filtered
-    for (int i = 0; i < *m; i++) { // m = num rows A
+    // printing the new a that is now filtered
+    for (int i = 0; i < *m; i++) { //m = num rows A
         std::cout << "Row " << i << ": ";
-        for (int j = 0; j < *k; j++) { // k = common dimension
+        for (int j = 0; j < *k; j++) { //k = common dimension
             int index = j * *lda + i;
-            std::cout << (*a)[index] << " ";
+            std::cout << a[index] << " ";
         }
         std::cout << std::endl;
-    }
-
-    // Assuming sgemm_ is a predefined function for matrix multiplication
-    // Calling sgemm_
+    } 
+        //Calling sgemm_
+        // Need to send pointers since we're using the passed arguments
     sgemm_(
         transa, transb,
         m, n, k,
         alpha,
-        *a, lda,
+        a, lda,
         b, ldb,
         beta,
-        *c, ldc);
-
+        c, ldc);
+    
     /*
     Re-inserting the NaNs back into the matrix
     To do so, we will need to create a new matrix with the same dimensions as the original matrix C.
@@ -347,12 +345,12 @@ void preprocessing(
     float* new_c = new float[*ldc * *n];
 
     // Pointer to keep track of where we are in C, C is written back in column-major order
-    float* c_ptr = *c;
+    float* c_ptr = c;
     float* new_c_ptr = new_c;
     for (int i = 0; i < *ldc; ++i) {
         for (int j = 0; j < *n; ++j) {
             if (row_to_remove[i]) {
-                *new_c_ptr = -1; // testing with -1 first, then I'm going to replace with std::nanf("");
+                *new_c_ptr = -1; // testing with -1 first, then im going to replace w/ std::nanf("");
             } else {
                 *new_c_ptr = *c_ptr;
                 c_ptr++;
@@ -361,17 +359,16 @@ void preprocessing(
         }
     }
     // Resetting pointers for c
-    // delete[] *c; // Free the old memory
-    *c = new_c;
+    c = new_c;
 
-    // Printing new C
+    //Printing new C
     std::cout << std::endl;
     std::cout << "Printing updated NaN removed matrix C: " << std::endl;
-    for (int i = 0; i < *ldc; i++) { // m = num rows A
+    for (int i = 0; i < *ldc; i++) { //m = num rows A
         std::cout << "Row " << i << ": ";
-        for (int j = 0; j < *n; j++) { // k = common dimension
+        for (int j = 0; j < *n; j++) { //k = common dimension
             int index = j * *ldc + i;
-            std::cout << (*c)[index] << " ";
+            std::cout << c[index] << " ";
         }
         std::cout << std::endl;
     }
