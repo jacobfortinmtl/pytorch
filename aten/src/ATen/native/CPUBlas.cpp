@@ -201,10 +201,10 @@ void gemm(
   internal::normalize_last_dims(transa, transb, m, n, k, &lda, &ldb, &ldc);
 
   // Print the shapes of the input matrices
-  // std::cout << "Size in CPUBLAS.cpp: " << std::endl;
-  // std::cout << "Matrix A shape: (" << m << ", " << k << ")" << std::endl;
-  // std::cout << "Matrix B shape: (" << k << ", " << n << ")" << std::endl;
-  // std::cout << "Matrix C shape: (" << m << ", " << n << ")" << std::endl;
+  std::cout << "Size in CPUBLAS.cpp: " << std::endl;
+  std::cout << "Matrix A shape: (" << m << ", " << k << ")" << std::endl;
+  std::cout << "Matrix B shape: (" << k << ", " << n << ")" << std::endl;
+  std::cout << "Matrix C shape: (" << m << ", " << n << ")" << std::endl;
 #if AT_MKLDNN_ENABLED()
    if (mkldnn_bf32_gemm(transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)) {
      return;
@@ -272,85 +272,46 @@ void preprocessing(
     float* beta, float* c, int* ldc) 
 {
     int nan_threshold = 2; // having more NaNs than this will delete the row
-    float* row_major_matrix = new float[*m * *k]; // Allocate memory for the row-major matrix
-    // Creating pointers to the rows of the row-major matrix
-    float** row_ptrs = new float*[*m];
-    // creating a vector to store the indices of the rows to be removed
-    float** removed_rows = new float*[*m];
-    // creating the array to keep the indexes
-    int *removed_row_indexes = new int[*m];
-    
+    bool* row_to_remove = new bool[*m];
+    int rows_removed = 0;
+    int new_m = *m;
 
-    // Convert column-major to row-major
+    // Identify rows to remove
     for (int i = 0; i < *m; ++i) {
-        for (int j = 0; j < *k; ++j) {
-            row_major_matrix[i * (*k) + j] = a[j * (*lda) + i];
-        }
-    }
-
-    // setting the pointers to the row stars    
-    for (int i = 0; i < *m; ++i) {
-        row_ptrs[i] = &row_major_matrix[i * (*k)];
-    }
-
-    // counting the number of NaN per row
-    int rows_updated = 0;
-    for (int i = 0; i < *m; ++i){
         int nan_count = 0;
-        for (int j = 0; j < *k; ++j){
-            if (std::isnan(row_ptrs[i][j])){
-                nan_count++;
-                if (nan_count > nan_threshold){
-                  // adding the row to the removed rows
-                  rows_updated++;
-                  removed_rows[i] = row_ptrs[i];
-                  removed_row_indexes[i] = 1;
-                  continue;
-                }
-            }   
-        }
-    }
-
-    //writing into new contiguous memory in column-major order
-    float* new_a = new float[*m * *k - rows_updated];
-    float* ins_pointer = new_a;
-    for (int j = 0; j < *k; ++j){
-        for (int i = 0; i < *m; ++i){
-            if (removed_row_indexes[i] == 1){
-                continue;
-            }
-            else{
-                *ins_pointer = row_ptrs[i][j];
-                ++ins_pointer; //increase the pointer localiation by 1
-            }
-        }
-    }
-
-
-    // printing out the row-major matrix using our pointers
-    std::cout << "Printing row-major matrix: " << std::endl;
-    for (int i = 0; i < *m; ++i) {
-        std::cout << "Row " << i << ": ";
+        row_to_remove[i] = false;
         for (int j = 0; j < *k; ++j) {
-            std::cout << row_ptrs[i][j] << " ";
+            if (std::isnan(a[j * (*lda) + i])) {
+                nan_count++;
+                if (nan_count > nan_threshold) {
+                    row_to_remove[i] = true;
+                    new_m--;
+                    rows_removed++;
+                    break;
+                }
+            }
         }
-        std::cout << std::endl;
     }
-    std::cout << std::endl;
+
+    // Allocate memory for the new matrix
+    float* new_a = new float[new_m * (*k)];
+    int new_row = 0;
+
+    // Write the new matrix in column-major order
+    for (int j = 0; j < *k; ++j) {
+        new_row = 0;
+        for (int i = 0; i < *m; ++i) {
+            if (!row_to_remove[i]) {
+                new_a[j * new_m + new_row] = a[j * (*lda) + i];
+                new_row++;
+            }
+        }
+    }
+
     // Setting the pointer of a to this new memory location and updating sizes
     a = new_a;
-    *m = *m - rows_updated;
-    *lda = *m;
-
-    // Printing the updated sizes
-    std::cout << "Updated sizes: " << std::endl;
-    std::cout << "m: " << *m << std::endl;
-    std::cout << "n: " << *n << std::endl;
-    std::cout << "k: " << *k << std::endl;
-    std::cout << "lda: " << *lda << std::endl;
-    std::cout << "ldb: " << *ldb << std::endl;
-    std::cout << "ldc: " << *ldc << std::endl;
-    std::cout << std::endl;
+    *m = new_m;
+    *lda = new_m;
 
     std::cout << "Printing updated NaN removed matrix: " << std::endl;
     // printing the new a that is now filtered
@@ -373,15 +334,10 @@ void preprocessing(
         beta,
         c, ldc);
 
-    //deleting allocated memory
-    delete[] row_ptrs;
-    row_ptrs = nullptr;
+    // Re-inserting the NaNs back into the matrix
+    // Horrible time complexity because we need to shift the elements to the right to fit the changes
 
-    delete[] removed_rows;
-    removed_rows = nullptr;
-
-    delete[] removed_row_indexes;
-    removed_row_indexes = nullptr;
+    delete[] new_a;
 }
 
 
