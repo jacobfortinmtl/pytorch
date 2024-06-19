@@ -335,27 +335,30 @@ void preprocessing(
         c, ldc);
     
     /*
-    Re-inserting the NaNs back into the matrix
+    TODO Improve COMPLEXITIES
+    Re-inserting the NaNs back into the matrix. Current soso algorithm
     To do so, we will need to create a new matrix with the same dimensions as the original matrix C.
     We will need to keep two pointers, one for the original matrix C and one in A, and iterate through the rows of C.
     If a row was marked for removal, we will add NaNs to the row in C. Else, we will add the value that was
     already in C.
     */
-    // Creating new matrix C
+  
     float* new_c = new float[*ldc * *n];
-
-    // Pointer to keep track of where we are in C, C is written back in column-major order
     float* c_ptr = c;
     float* new_c_ptr = new_c;
+    // Pointer to keep track of where we are in C, C is written back in column-major order
     for (int i = 0; i < *ldc; ++i) {
-        for (int j = 0; j < *n; ++j) {
-            if (row_to_remove[i]) {
+        if (row_to_remove[i]) {
+            for (int j = 0; j < *n; ++j) {
                 *new_c_ptr = -1; // testing with -1 first, then im going to replace w/ std::nanf("");
-            } else {
+                new_c_ptr++;
+            }
+        } else {
+            for (int j = 0; j < *n; ++j) {
                 *new_c_ptr = *c_ptr;
+                new_c_ptr++;
                 c_ptr++;
             }
-            new_c_ptr++;
         }
     }
     // Copying over. Cant just change the pointer without changing a bunch of fct def
