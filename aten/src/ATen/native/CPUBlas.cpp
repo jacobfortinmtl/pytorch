@@ -230,14 +230,6 @@ void gemm(
 
     // Custom pre-processing steps
     preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, a, &lda_, b, &ldb_, &beta_, c, &ldc_);
-    sgemm_(
-        &transa_, &transb_,
-        &m_, &n_, &k_,
-        &alpha_,
-        a, &lda_,
-        b, &ldb_,
-        &beta_,
-        c, &ldc_);
     #endif
     return;
   }
@@ -255,7 +247,7 @@ void gemm(
 //                   'N' for no transpose, 'T' for transpose, 'C' for conjugate transpose.
 
 // m and n: Dimensions of the matrices. 
-//          m is the number of rows, n is the number of columns.
+//          m is the number of rows of A and C, n is the number of columns of B and C.
 
 // k: Common dimension for the multiplication.
 //    If A and B are the matrices being multiplied, A has dimensions m x k and B has dimensions k x n.
@@ -279,55 +271,117 @@ void preprocessing(
     float* alpha, const float* a, int* lda, const float* b, int* ldb, 
     float* beta, float* c, int* ldc) 
 {
-    // Creating our vector of pointers that will point to each row of the matrix
-    // We will use this to remove rows with NaNs
-    std::vector<std::vector<const float*>> rows;
+    int nan_threshold = 2; // having more NaNs than this will delete the row
+    float* row_major_matrix = new float[*m * *k]; // Allocate memory for the row-major matrix
+    // Creating pointers to the rows of the row-major matrix
+    float** row_ptrs = new float*[*m];
+    // creating a vector to store the indices of the rows to be removed
+    float** removed_rows = new float*[*m];
+    // creating the array to keep the indexes
+    int *removed_row_indexes = new int[*m];
+    
 
-    // setting the elements of the array to point to the specific row
-    for (int i = 0; i < *m; i++) { //m = num rows in A
-        std::vector<const float*> row;
-        for (int j = 0; j < *k; j++) { //k = common dimension
-            int index = j * *lda + i;
-            row.push_back(&a[index]); 
+    // Convert column-major to row-major
+    for (int i = 0; i < *m; ++i) {
+        for (int j = 0; j < *k; ++j) {
+            row_major_matrix[i * (*k) + j] = a[j * (*lda) + i];
         }
-        rows.push_back(row);
     }
-    std::vector<int> removed_indexes = {}; 
-    // counting the number of nans in each row and removes those that have nan above threshold
-    int threshold = 2;
-    int row_index = 0;
-    // using the erase-remove idiom to remove rows with nans
-    // marking the rows to remove
-    rows.erase(
-      std::remove_if(
-        rows.begin(),
-        rows.end(),
-        [&removed_indexes, &threshold, &row_index] (const auto& row) {
-            int nan_count = 0;
-            for (const auto& element: row) {
-                if (std::isnan(*element)) {
-                    nan_count++;
+
+    // setting the pointers to the row stars    
+    for (int i = 0; i < *m; ++i) {
+        row_ptrs[i] = &row_major_matrix[i * (*k)];
+    }
+
+    // counting the number of NaN per row
+    int rows_updated = 0;
+    for (int i = 0; i < *m; ++i){
+        int nan_count = 0;
+        for (int j = 0; j < *k; ++j){
+            if (std::isnan(row_ptrs[i][j])){
+                nan_count++;
+                if (nan_count > nan_threshold){
+                  // adding the row to the removed rows
+                  rows_updated++;
+                  removed_rows[i] = row_ptrs[i];
+                  removed_row_indexes[i] = 1;
+                  continue;
                 }
+            }   
+        }
+    }
+
+    //writing into new contiguous memory in column-major order
+    float* new_a = new float[*m * *k - rows_updated];
+    float* ins_pointer = new_a;
+    for (int j = 0; j < *k; ++j){
+        for (int i = 0; i < *m; ++i){
+            if (removed_row_indexes[i] == 1){
+                continue;
             }
-            if (nan_count > threshold) {
-                removed_indexes.push_back(row_index);
-                row_index++;
-                return true;
+            else{
+                *ins_pointer = row_ptrs[i][j];
+                ++ins_pointer; //increase the pointer localiation by 1
             }
-            row_index++;
-            return false;
-          }
-        ),
-      rows.end()
-    );
-    // Printing the contents of the loop
-    for (const auto& row: rows){
-        std::cout << "Row: ";
-        for (const auto& element: row){ 
-            std::cout << *element << " ";
+        }
+    }
+
+
+    // printing out the row-major matrix using our pointers
+    std::cout << "Printing row-major matrix: " << std::endl;
+    for (int i = 0; i < *m; ++i) {
+        std::cout << "Row " << i << ": ";
+        for (int j = 0; j < *k; ++j) {
+            std::cout << row_ptrs[i][j] << " ";
         }
         std::cout << std::endl;
     }
+    std::cout << std::endl;
+    // Setting the pointer of a to this new memory location and updating sizes
+    a = new_a;
+    *m = *m - rows_updated;
+    *lda = *m;
+
+    // Printing the updated sizes
+    std::cout << "Updated sizes: " << std::endl;
+    std::cout << "m: " << *m << std::endl;
+    std::cout << "n: " << *n << std::endl;
+    std::cout << "k: " << *k << std::endl;
+    std::cout << "lda: " << *lda << std::endl;
+    std::cout << "ldb: " << *ldb << std::endl;
+    std::cout << "ldc: " << *ldc << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Printing updated NaN removed matrix: " << std::endl;
+    // printing the new a that is now filtered
+    for (int i = 0; i < *m; i++) { //m = num rows A
+        std::cout << "Row " << i << ": ";
+        for (int j = 0; j < *k; j++) { //k = common dimension
+            int index = j * *lda + i;
+            std::cout << a[index] << " ";
+        }
+        std::cout << std::endl;
+    } 
+        //Calling sgemm_
+        // Need to send pointers since we're using the passed arguments
+    sgemm_(
+        transa, transb,
+        m, n, k,
+        alpha,
+        a, lda,
+        b, ldb,
+        beta,
+        c, ldc);
+
+    //deleting allocated memory
+    delete[] row_ptrs;
+    row_ptrs = nullptr;
+
+    delete[] removed_rows;
+    removed_rows = nullptr;
+
+    delete[] removed_row_indexes;
+    removed_row_indexes = nullptr;
 }
 
 
