@@ -1,11 +1,46 @@
 #define TORCH_ASSERT_ONLY_METHOD_OPERATORS
+#include <ATen/core/Tensor.h>
+#include <ATen/Dispatch.h>
+#include <ATen/NamedTensorUtils.h>
+#include <ATen/ScalarOps.h>
+#include <ATen/TensorIndexing.h>
+#include <ATen/TensorMeta.h>
+#include <ATen/TensorOperators.h>
+#include <ATen/WrapDimUtils.h>
+#include <ATen/native/BinaryOps.h>
+#include <ATen/native/ReduceOpsUtils.h>
+#include <ATen/native/Resize.h>
+#include <ATen/native/TensorCompare.h>
+#include <ATen/native/TypeProperties.h>
+#include <ATen/TensorSubclassLikeUtils.h>
+#include <iostream>
+#include <c10/util/Exception.h>
 #include <ATen/native/CPUBlas.h>
+#include <ATen/ops/from_blob.h>
+#include <ATen/ops/isnan_native.h>
+#include <ATen/TensorIndexing.h>
+#include <ATen/TensorOperators.h>
+#include <ATen/ops/index.h>
 #include <ATen/native/mkl/LinearAlgebra.h>
 #include <ATen/native/mkldnn/Matmul.h>
 #include <ATen/Config.h>
-
+#include <iostream>
 #include <c10/util/SmallBuffer.h>
 #include <c10/util/irange.h>
+#include <ATen/ops/slice.h>
+#include <ATen/ops/slice_backward_native.h>
+#include <ATen/ops/slice_copy_native.h>
+#include <ATen/ops/slice_inverse_native.h>
+#include <ATen/ops/slice_native.h>
+#include <ATen/ops/slice_scatter_native.h>
+#include <ATen/Tensor.h>
+#include <ATen/native/TensorAdvancedIndexing.h>
+#include <ATen/native/IndexKernel.h>
+#include <ATen/native/IndexingUtils.h>
+#include <algorithm>
+#include <vector>
+
+
 
 #include <climits>
 
@@ -164,6 +199,12 @@ void gemm(
     const float beta,
     float *c, int64_t ldc) {
   internal::normalize_last_dims(transa, transb, m, n, k, &lda, &ldb, &ldc);
+
+  // Print the shapes of the input matrices
+  // std::cout << "Size in CPUBLAS.cpp: " << std::endl;
+  // std::cout << "Matrix A shape: (" << m << ", " << k << ")" << std::endl;
+  // std::cout << "Matrix B shape: (" << k << ", " << n << ")" << std::endl;
+  // std::cout << "Matrix C shape: (" << m << ", " << n << ")" << std::endl;
 #if AT_MKLDNN_ENABLED()
    if (mkldnn_bf32_gemm(transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)) {
      return;
@@ -186,14 +227,9 @@ void gemm(
       c, ldc_);
     #else
     char transa_ = to_blas(transa), transb_ = to_blas(transb);
-    sgemm_(
-        &transa_, &transb_,
-        &m_, &n_, &k_,
-        &alpha_,
-        a, &lda_,
-        b, &ldb_,
-        &beta_,
-        c, &ldc_);
+
+    // Custom pre-processing steps
+    preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, a, &lda_, b, &ldb_, &beta_, c, &ldc_);
     #endif
     return;
   }
@@ -202,6 +238,178 @@ void gemm(
       at::kCPU, at::kFloat,
       transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
 }
+
+// The function takes similar arguments as the sgemm_ function but restructures the output
+// to remove rows with NaNs and collapse the matrix into a smaller, denser matrix.
+// It takes as input pointers to matrices A, B, and C, and the dimensions of the matrices.
+
+// transa and transb: Characters specifying whether matrices A and B are to be transposed.
+//                   'N' for no transpose, 'T' for transpose, 'C' for conjugate transpose.
+
+// m and n: Dimensions of the matrices. 
+//          m is the number of rows of A and C, n is the number of columns of B and C.
+
+// k: Common dimension for the multiplication.
+//    If A and B are the matrices being multiplied, A has dimensions m x k and B has dimensions k x n.
+
+// alpha: Scalar multiplier for the product of matrices A and B.
+
+// a and b: Pointers to the matrices being multiplied.
+
+// lda and ldb: Leading dimensions of matrices A and B. 
+//             The leading dimension is the size of the memory storage of the matrix.
+
+// beta: Scalar multiplier for matrix C.
+
+// c: Pointer to the resultant matrix after multiplication.
+
+// ldc: Leading dimension of matrix C.
+
+
+void preprocessing(
+    char* transa, char* transb, int* m, int* n, int* k, 
+    float* alpha, const float* a, int* lda, const float* b, int* ldb, 
+    float* beta, float* c, int* ldc) 
+{
+    int nan_threshold = 2; // having more NaNs than this will delete the row
+    bool* row_to_remove = new bool[*m];
+    int rows_removed = 0;
+    int new_m = *m;
+
+    // Identify rows to remove
+    for (int i = 0; i < *m; ++i) {
+        int nan_count = 0;
+        row_to_remove[i] = false;
+        for (int j = 0; j < *k; ++j) {
+            if (std::isnan(a[j * (*lda) + i])) {
+                nan_count++;
+                if (nan_count > nan_threshold) {
+                    row_to_remove[i] = true;
+                    new_m--;
+                    rows_removed++;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Allocate memory for the new matrix
+    float* new_a = new float[new_m * (*k)];
+    int new_row = 0;
+
+    // Write the new matrix in column-major order
+    for (int j = 0; j < *k; ++j) {
+        new_row = 0;
+        for (int i = 0; i < *m; ++i) {
+            if (!row_to_remove[i]) {
+                new_a[j * new_m + new_row] = a[j * (*lda) + i];
+                new_row++;
+            }
+        }
+    }
+
+    // Setting the pointer of a to this new memory location and updating sizes
+    a = new_a;
+    *m = new_m;
+    *lda = new_m;
+
+    std::cout << "Printing updated NaN removed matrix: " << std::endl;
+    // printing the new a that is now filtered
+    for (int i = 0; i < *m; i++) { //m = num rows A
+        std::cout << "Row " << i << ": ";
+        for (int j = 0; j < *k; j++) { //k = common dimension
+            int index = j * *lda + i;
+            std::cout << a[index] << " ";
+        }
+        std::cout << std::endl;
+    } 
+        //Calling sgemm_
+        // Need to send pointers since we're using the passed arguments
+    sgemm_(
+        transa, transb,
+        m, n, k,
+        alpha,
+        a, lda,
+        b, ldb,
+        beta,
+        c, ldc);
+    
+    /*
+    Method 1: Right-to left in-place NaN insertions.
+    To do so, we will keep two pointers in Matrix C and iterate from right to left. The first pointer will point to index *lda - 1. 
+    The second will point to C + *lda * *n - 1. If the value in the row is NaN, we will insert NaNs at the second pointer. Else, we will
+    insert at the second pointer, the value pointed by the first pointer. 
+    Best Case: 1 copy, O(n) time complexity
+    Worst Case: 1 full copy, O(n) time complexity
+    */
+    // Pointer 1: End of matrix C
+    float* c_ptr = c + *ldc * *n - 1;
+    // Pointer 2: At index *lda - 1
+    float* c_ptrLDA = c + *lda - 1;
+
+    // Algorithm
+    for (int i = *ldc - 1; i >= 0; --i){
+        if (row_to_remove[i]){
+            for (int j = 0; j < *n; ++j){
+                *c_ptr = -1; // testing with -1 first, then im going to replace w/ std::nanf("");
+                c_ptr--;
+            }
+        } else {
+            for (int j = 0; j < *n; ++j){
+                *c_ptr = *c_ptrLDA;
+                c_ptr--;
+                c_ptrLDA--;
+            }
+        }
+    }
+    /*
+    Method Two, using MEMCOPY
+    To do so, we will need to create a new matrix with the same dimensions as the original matrix C.
+    We will need to keep two pointers, one for the original matrix C and one in A, and iterate through the rows of C.
+    If a row was marked for removal, we will add NaNs to the row in C. Else, we will add the value that was
+    already in C.
+    Best = Worst: O(n) time complexity and 2 copies.
+    note: we are assuming that the matrix C is in column-major order, so no need calculate index
+    */
+  
+    // float* new_c = new float[*ldc * *n];
+    // float* c_ptr = c;
+    // float* new_c_ptr = new_c;
+    // // Pointer to keep track of where we are in C, C is written back in column-major order
+    // for (int i = 0; i < *ldc; ++i) {
+    //     if (row_to_remove[i]) {
+    //         for (int j = 0; j < *n; ++j) {
+    //             *new_c_ptr = -1; // testing with -1 first, then im going to replace w/ std::nanf("");
+    //             new_c_ptr++;
+    //         }
+    //     } else {
+    //         for (int j = 0; j < *n; ++j) {
+    //             *new_c_ptr = *c_ptr;
+    //             new_c_ptr++;
+    //             c_ptr++;
+    //         }
+    //     }
+    // }
+    // // Copying over. Cant just change the pointer without changing a bunch of fct def
+    // memcpy(c, new_c, sizeof(float) * (*ldc) * (*n));
+    
+    
+    //Printing new C
+    std::cout << std::endl;
+    std::cout << "Printing updated NaN removed matrix C: " << std::endl;
+    for (int i = 0; i < *ldc; i++) { //m = num rows A
+        std::cout << "Row " << i << ": ";
+        for (int j = 0; j < *n; j++) { //k = common dimension
+            int index = j * *ldc + i;
+            std::cout << c[index] << " ";
+        }
+        std::cout << std::endl;
+    }
+    delete[] new_a;
+    //delete[] new_c; // TODO Uncomment if using method 2
+    delete[] row_to_remove;
+}
+
 
 void gemm(
     TransposeType transa, TransposeType transb,

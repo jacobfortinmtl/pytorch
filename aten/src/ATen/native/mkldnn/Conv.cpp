@@ -241,6 +241,12 @@ static void _mkldnn_convolution_out (
         is_channels_last,
         op_attr);
   } else {
+    // std::cout << "MKLDNN IMPLEMENTATION HERE" << std::endl;
+    // printing the shape
+    for (int i = 0; i < output_sizes.size(); i++) {
+      // std::cout << "size: " << std::endl;
+      // std::cout << output_sizes[i] << " ";
+    }
     ideep::convolution_forward::compute_v3(
         x,
         w,
