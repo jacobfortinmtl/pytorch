@@ -335,34 +335,65 @@ void preprocessing(
         c, ldc);
     
     /*
-    TODO Improve COMPLEXITIES
-    Re-inserting the NaNs back into the matrix. Current soso algorithm
+    Method 1: Right-to left in-place NaN insertions.
+    To do so, we will keep two pointers in Matrix C and iterate from right to left. The first pointer will point to index *lda - 1. 
+    The second will point to C + *lda * *n - 1. If the value in the row is NaN, we will insert NaNs at the second pointer. Else, we will
+    insert at the second pointer, the value pointed by the first pointer. 
+    Best Case: 1 copy, O(n) time complexity
+    Worst Case: 1 full copy, O(n) time complexity
+    */
+    // Pointer 1: End of matrix C
+    float* c_ptr = c + *ldc * *n - 1;
+    // Pointer 2: At index *lda - 1
+    float* c_ptrLDA = c + *lda - 1;
+
+    // Algorithm
+    for (int i = *ldc - 1; i >= 0; --i){
+        if (row_to_remove[i]){
+            for (int j = 0; j < *n; ++j){
+                *c_ptr = -1; // testing with -1 first, then im going to replace w/ std::nanf("");
+                c_ptr--;
+            }
+        } else {
+            for (int j = 0; j < *n; ++j){
+                *c_ptr = *c_ptrLDA;
+                c_ptr--;
+                c_ptrLDA--;
+            }
+        }
+    }
+    /*
+    Method Two, using MEMCOPY
     To do so, we will need to create a new matrix with the same dimensions as the original matrix C.
     We will need to keep two pointers, one for the original matrix C and one in A, and iterate through the rows of C.
     If a row was marked for removal, we will add NaNs to the row in C. Else, we will add the value that was
     already in C.
+    Best = Worst: O(n) time complexity and 2 copies.
+    note: we are assuming that the matrix C is in column-major order, so no need calculate index
     */
   
-    float* new_c = new float[*ldc * *n];
-    float* c_ptr = c;
-    float* new_c_ptr = new_c;
-    // Pointer to keep track of where we are in C, C is written back in column-major order
-    for (int i = 0; i < *ldc; ++i) {
-        if (row_to_remove[i]) {
-            for (int j = 0; j < *n; ++j) {
-                *new_c_ptr = -1; // testing with -1 first, then im going to replace w/ std::nanf("");
-                new_c_ptr++;
-            }
-        } else {
-            for (int j = 0; j < *n; ++j) {
-                *new_c_ptr = *c_ptr;
-                new_c_ptr++;
-                c_ptr++;
-            }
-        }
-    }
-    // Copying over. Cant just change the pointer without changing a bunch of fct def
-    memcpy(c, new_c, sizeof(float) * (*ldc) * (*n));
+    // float* new_c = new float[*ldc * *n];
+    // float* c_ptr = c;
+    // float* new_c_ptr = new_c;
+    // // Pointer to keep track of where we are in C, C is written back in column-major order
+    // for (int i = 0; i < *ldc; ++i) {
+    //     if (row_to_remove[i]) {
+    //         for (int j = 0; j < *n; ++j) {
+    //             *new_c_ptr = -1; // testing with -1 first, then im going to replace w/ std::nanf("");
+    //             new_c_ptr++;
+    //         }
+    //     } else {
+    //         for (int j = 0; j < *n; ++j) {
+    //             *new_c_ptr = *c_ptr;
+    //             new_c_ptr++;
+    //             c_ptr++;
+    //         }
+    //     }
+    // }
+    // // Copying over. Cant just change the pointer without changing a bunch of fct def
+    // memcpy(c, new_c, sizeof(float) * (*ldc) * (*n));
+    
+    
     //Printing new C
     std::cout << std::endl;
     std::cout << "Printing updated NaN removed matrix C: " << std::endl;
@@ -375,7 +406,7 @@ void preprocessing(
         std::cout << std::endl;
     }
     delete[] new_a;
-    delete[] new_c;
+    //delete[] new_c; // TODO Uncomment if using method 2
     delete[] row_to_remove;
 }
 
