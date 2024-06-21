@@ -411,6 +411,7 @@ void preprocessing(
         }
         std::cout << std::endl;
     }
+    std::cout << "Rows removed: " << rows_removed << std::endl;
     delete[] new_a;
     //delete[] new_c; // TODO Uncomment if using method 2
     delete[] row_to_remove;
