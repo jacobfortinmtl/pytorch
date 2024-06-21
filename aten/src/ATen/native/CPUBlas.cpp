@@ -302,7 +302,13 @@ void preprocessing(
         new_row = 0;
         for (int i = 0; i < *m; ++i) {
             if (!row_to_remove[i]) {
-                new_a[j * new_m + new_row] = a[j * (*lda) + i];
+                // if the value was supposed to be NaN, replace with 0
+                if (std::isnan(a[j * (*lda) + i])) {
+                    new_a[j * new_m + new_row] = 0;
+                }
+                else{
+                    new_a[j * new_m + new_row] = a[j * (*lda) + i];
+                }
                 new_row++;
             }
         }
@@ -351,7 +357,7 @@ void preprocessing(
     for (int i = *ldc - 1; i >= 0; --i){
         if (row_to_remove[i]){
             for (int j = 0; j < *n; ++j){
-                *c_ptr = -1; // testing with -1 first, then im going to replace w/ std::nanf("");
+                *c_ptr = std::numeric_limits<float>::quiet_NaN();
                 c_ptr--;
             }
         } else {
@@ -396,7 +402,7 @@ void preprocessing(
     
     //Printing new C
     std::cout << std::endl;
-    std::cout << "Printing updated NaN removed matrix C: " << std::endl;
+    std::cout << "Printing after insertion " << std::endl;
     for (int i = 0; i < *ldc; i++) { //m = num rows A
         std::cout << "Row " << i << ": ";
         for (int j = 0; j < *n; j++) { //k = common dimension

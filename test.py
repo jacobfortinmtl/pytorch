@@ -12,7 +12,7 @@ num_nans = size // 3
 
 # Create a random permutation of the indices
 indices = torch.randperm(size)
-input_tensor = torch.arange(1,26)  # generates integers between 1 and 81
+input_tensor = torch.arange(1,26)
 # Convert the integer tensor to float
 input_tensor = input_tensor.float()
 # Set the elements at the indices to NaN
