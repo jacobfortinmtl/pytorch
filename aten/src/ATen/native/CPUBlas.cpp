@@ -40,7 +40,8 @@
 #include <algorithm>
 #include <vector>
 
-
+// For parallelization using openMP
+#include <omp.h>
 
 #include <climits>
 
@@ -229,7 +230,22 @@ void gemm(
     char transa_ = to_blas(transa), transb_ = to_blas(transb);
 
     // Custom pre-processing steps
-    preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, a, &lda_, b, &ldb_, &beta_, c, &ldc_);
+    // Get environment variable to choose whether we call preprocessing or not
+    char* env_var = std::getenv("SQUASH");
+    if (env_var != NULL && std::string(env_var) == "1") {
+      std::cout << "Preprocessing" << std::endl;
+      preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, a, &lda_, b, &ldb_, &beta_, c, &ldc_);
+    }else{
+      std::cout << "Not Preprocessing" << std::endl;
+      sgemm_(
+        &transa_, &transb_,
+        &m_, &n_, &k_,
+        &alpha_,
+        a, &lda_,
+        b, &ldb_,
+        &beta_,
+        c, &ldc_);
+    }
     #endif
     return;
   }
@@ -274,11 +290,17 @@ void preprocessing(
     int nan_threshold = 2; // having more NaNs than this will delete the row
     bool* row_to_remove = new bool[*m];
     int rows_removed = 0;
+    int nan_count = 0;
     int new_m = *m;
 
-    // Identify rows to remove
+// Identify rows to remove
+/* Parallelizing the outer for loop using OpenMP
+Private vs reduction, both create copies but those in private are not aggragated at the end, but rather discarded. 
+We use these to prevent race conditions.
+*/
+    #pragma omp parallel for reduction(+:rows_removed) reduction(-:new_m) private (nan_count)
     for (int i = 0; i < *m; ++i) {
-        int nan_count = 0;
+        nan_count = 0;
         row_to_remove[i] = false;
         for (int j = 0; j < *k; ++j) {
             if (std::isnan(a[j * (*lda) + i])) {
@@ -298,6 +320,8 @@ void preprocessing(
     int new_row = 0;
 
     // Write the new matrix in column-major order
+    // Parelleliztion
+    #pragma omp parallel for private(new_row)
     for (int j = 0; j < *k; ++j) {
         new_row = 0;
         for (int i = 0; i < *m; ++i) {
@@ -319,16 +343,17 @@ void preprocessing(
     *m = new_m;
     *lda = new_m;
 
-    std::cout << "Printing updated NaN removed matrix: " << std::endl;
-    // printing the new a that is now filtered
-    for (int i = 0; i < *m; i++) { //m = num rows A
-        std::cout << "Row " << i << ": ";
-        for (int j = 0; j < *k; j++) { //k = common dimension
-            int index = j * *lda + i;
-            std::cout << a[index] << " ";
-        }
-        std::cout << std::endl;
-    } 
+    // TODO Uncomment to print
+    // std::cout << "Printing updated NaN removed matrix: " << std::endl;
+    // // printing the new a that is now filtered
+    // for (int i = 0; i < *m; i++) { //m = num rows A
+    //     std::cout << "Row " << i << ": ";
+    //     for (int j = 0; j < *k; j++) { //k = common dimension
+    //         int index = j * *lda + i;
+    //         std::cout << a[index] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // } 
         //Calling sgemm_
         // Need to send pointers since we're using the passed arguments
     sgemm_(
@@ -400,17 +425,17 @@ void preprocessing(
     // memcpy(c, new_c, sizeof(float) * (*ldc) * (*n));
     
     
-    //Printing new C
-    std::cout << std::endl;
-    std::cout << "Printing after insertion " << std::endl;
-    for (int i = 0; i < *ldc; i++) { //m = num rows A
-        std::cout << "Row " << i << ": ";
-        for (int j = 0; j < *n; j++) { //k = common dimension
-            int index = j * *ldc + i;
-            std::cout << c[index] << " ";
-        }
-        std::cout << std::endl;
-    }
+    // TODO uncommment to print  new C
+    // std::cout << std::endl;
+    // std::cout << "Printing after insertion " << std::endl;
+    // for (int i = 0; i < *ldc; i++) { //m = num rows A
+    //     std::cout << "Row " << i << ": ";
+    //     for (int j = 0; j < *n; j++) { //k = common dimension
+    //         int index = j * *ldc + i;
+    //         std::cout << c[index] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
     std::cout << "Rows removed: " << rows_removed << std::endl;
     delete[] new_a;
     //delete[] new_c; // TODO Uncomment if using method 2
