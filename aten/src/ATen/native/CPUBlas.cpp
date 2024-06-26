@@ -231,12 +231,8 @@ void gemm(
 
     // Custom pre-processing steps
     // Get environment variable to choose whether we call preprocessing or not
-    char* env_var = std::getenv("SQUASH");
+    char* env_var = std::getenv("DEFAULT");
     if (env_var != NULL && std::string(env_var) == "1") {
-      std::cout << "Preprocessing" << std::endl;
-      preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, a, &lda_, b, &ldb_, &beta_, c, &ldc_);
-    }else{
-      std::cout << "Not Preprocessing" << std::endl;
       sgemm_(
         &transa_, &transb_,
         &m_, &n_, &k_,
@@ -245,6 +241,8 @@ void gemm(
         b, &ldb_,
         &beta_,
         c, &ldc_);
+    }else{
+      preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, a, &lda_, b, &ldb_, &beta_, c, &ldc_);
     }
     #endif
     return;
@@ -298,22 +296,42 @@ void preprocessing(
 Private vs reduction, both create copies but those in private are not aggragated at the end, but rather discarded. 
 We use these to prevent race conditions.
 */
-    #pragma omp parallel for reduction(+:rows_removed) reduction(-:new_m) private (nan_count)
-    for (int i = 0; i < *m; ++i) {
-        nan_count = 0;
-        row_to_remove[i] = false;
-        for (int j = 0; j < *k; ++j) {
-            if (std::isnan(a[j * (*lda) + i])) {
-                nan_count++;
-                if (nan_count > nan_threshold) {
-                    row_to_remove[i] = true;
-                    new_m--;
-                    rows_removed++;
-                    break;
+    char* env_parallel = std::getenv("SEQUENTIAL");
+    if (env_parallel != NULL && std::string(env_parallel) == "1"){
+          for (int i = 0; i < *m; ++i) {
+          nan_count = 0;
+          row_to_remove[i] = false;
+          for (int j = 0; j < *k; ++j) {
+              if (std::isnan(a[j * (*lda) + i])) {
+                  nan_count++;
+                  if (nan_count > nan_threshold) {
+                      row_to_remove[i] = true;
+                      new_m--;
+                      rows_removed++;
+                      break;
+                  }
+              }
+          }
+      }
+    }else{
+        #pragma omp parallel for reduction(+:rows_removed) reduction(-:new_m) private (nan_count)
+        for (int i = 0; i < *m; ++i) {
+            nan_count = 0;
+            row_to_remove[i] = false;
+            for (int j = 0; j < *k; ++j) {
+                if (std::isnan(a[j * (*lda) + i])) {
+                    nan_count++;
+                    if (nan_count > nan_threshold) {
+                        row_to_remove[i] = true;
+                        new_m--;
+                        rows_removed++;
+                        break;
+                    }
                 }
             }
         }
-    }
+    } 
+
 
     // Allocate memory for the new matrix
     float* new_a = new float[new_m * (*k)];
@@ -321,10 +339,27 @@ We use these to prevent race conditions.
 
     // Write the new matrix in column-major order
     // Parelleliztion
-    #pragma omp parallel for private(new_row)
-    for (int j = 0; j < *k; ++j) {
-        new_row = 0;
-        for (int i = 0; i < *m; ++i) {
+    if (env_parallel != NULL && std::string(env_parallel) == "1"){
+      for (int j = 0; j < *k; ++j) {
+      new_row = 0;
+      for (int i = 0; i < *m; ++i) {
+          if (!row_to_remove[i]) {
+              // if the value was supposed to be NaN, replace with 0
+              if (std::isnan(a[j * (*lda) + i])) {
+                  new_a[j * new_m + new_row] = 0;
+              }
+              else{
+                  new_a[j * new_m + new_row] = a[j * (*lda) + i];
+              }
+              new_row++;
+            }
+        }
+      }
+    }else{
+      #pragma omp parallel for private(new_row)
+      for (int j = 0; j < *k; ++j) {
+          new_row = 0;
+          for (int i = 0; i < *m; ++i) {
             if (!row_to_remove[i]) {
                 // if the value was supposed to be NaN, replace with 0
                 if (std::isnan(a[j * (*lda) + i])) {
@@ -335,6 +370,7 @@ We use these to prevent race conditions.
                 }
                 new_row++;
             }
+          }
         }
     }
 
@@ -378,7 +414,6 @@ We use these to prevent race conditions.
     // Pointer 2: At index *lda - 1
     float* c_ptrLDA = c + *lda - 1;
 
-    // TODO RE-COMMENT IN JUST TESTING IF ITS FAST ENOUGH WITHOUT RE-INSERTION WHICH IS THE ONLY NON-PARALLELIZED PART 
     // Algorithm
     for (int i = *ldc - 1; i >= 0; --i){
         if (row_to_remove[i]){
