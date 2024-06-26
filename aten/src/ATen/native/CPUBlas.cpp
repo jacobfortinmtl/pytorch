@@ -378,6 +378,7 @@ We use these to prevent race conditions.
     // Pointer 2: At index *lda - 1
     float* c_ptrLDA = c + *lda - 1;
 
+    // TODO RE-COMMENT IN JUST TESTING IF ITS FAST ENOUGH WITHOUT RE-INSERTION WHICH IS THE ONLY NON-PARALLELIZED PART 
     // Algorithm
     for (int i = *ldc - 1; i >= 0; --i){
         if (row_to_remove[i]){
