@@ -285,7 +285,12 @@ void preprocessing(
     float* alpha, const float* a, int* lda, const float* b, int* ldb, 
     float* beta, float* c, int* ldc) 
 {
-    int nan_threshold = 2; // having more NaNs than this will delete the row
+    // Get threshold from environment variable
+    int nan_threshold = 2; // defaults to 2
+    char* env_threshold = std::getenv("THRESHOLD");
+    if (env_threshold != NULL){
+      nan_threshold = std::stoi(env_threshold);
+    }
     bool* row_to_remove = new bool[*m];
     int rows_removed = 0;
     int nan_count = 0;
@@ -296,53 +301,32 @@ void preprocessing(
 Private vs reduction, both create copies but those in private are not aggragated at the end, but rather discarded. 
 We use these to prevent race conditions.
 */
-    char* env_parallel = std::getenv("SEQUENTIAL");
-    if (env_parallel != NULL && std::string(env_parallel) == "1"){
-          for (int i = 0; i < *m; ++i) {
-          nan_count = 0;
-          row_to_remove[i] = false;
-          for (int j = 0; j < *k; ++j) {
-              if (std::isnan(a[j * (*lda) + i])) {
-                  nan_count++;
-                  if (nan_count > nan_threshold) {
-                      row_to_remove[i] = true;
-                      new_m--;
-                      rows_removed++;
-                      break;
-                  }
-              }
-          }
-      }
-    }else{
-        #pragma omp parallel for reduction(+:rows_removed) reduction(-:new_m) private (nan_count)
-        for (int i = 0; i < *m; ++i) {
-            nan_count = 0;
-            row_to_remove[i] = false;
-            for (int j = 0; j < *k; ++j) {
-                if (std::isnan(a[j * (*lda) + i])) {
-                    nan_count++;
-                    if (nan_count > nan_threshold) {
-                        row_to_remove[i] = true;
-                        new_m--;
-                        rows_removed++;
-                        break;
-                    }
+    #pragma omp parallel for reduction(+:rows_removed) reduction(-:new_m) private (nan_count)
+    for (int i = 0; i < *m; ++i) {
+        nan_count = 0;
+        row_to_remove[i] = false;
+        for (int j = 0; j < *k; ++j) {
+            if (std::isnan(a[j * (*lda) + i])) {
+                nan_count++;
+                if (nan_count > nan_threshold) {
+                    row_to_remove[i] = true;
+                    new_m--;
+                    rows_removed++;
+                    break;
                 }
             }
         }
-    } 
-
-
+    }
     // Allocate memory for the new matrix
     float* new_a = new float[new_m * (*k)];
     int new_row = 0;
 
     // Write the new matrix in column-major order
     // Parelleliztion
-    if (env_parallel != NULL && std::string(env_parallel) == "1"){
-      for (int j = 0; j < *k; ++j) {
-      new_row = 0;
-      for (int i = 0; i < *m; ++i) {
+    #pragma omp parallel for private(new_row)
+    for (int j = 0; j < *k; ++j) {
+        new_row = 0;
+        for (int i = 0; i < *m; ++i) {
           if (!row_to_remove[i]) {
               // if the value was supposed to be NaN, replace with 0
               if (std::isnan(a[j * (*lda) + i])) {
@@ -352,28 +336,9 @@ We use these to prevent race conditions.
                   new_a[j * new_m + new_row] = a[j * (*lda) + i];
               }
               new_row++;
-            }
-        }
-      }
-    }else{
-      #pragma omp parallel for private(new_row)
-      for (int j = 0; j < *k; ++j) {
-          new_row = 0;
-          for (int i = 0; i < *m; ++i) {
-            if (!row_to_remove[i]) {
-                // if the value was supposed to be NaN, replace with 0
-                if (std::isnan(a[j * (*lda) + i])) {
-                    new_a[j * new_m + new_row] = 0;
-                }
-                else{
-                    new_a[j * new_m + new_row] = a[j * (*lda) + i];
-                }
-                new_row++;
-            }
           }
         }
-    }
-
+      }
     // Setting the pointer of a to this new memory location and updating sizes
     a = new_a;
     *m = new_m;
@@ -415,7 +380,14 @@ We use these to prevent race conditions.
     float* c_ptrLDA = c + *lda - 1;
 
     // Algorithm
-    for (int i = *ldc - 1; i >= 0; --i){
+    // check if envrinoment variable specifies re-insertion
+    int flag = 1; // defaults to running
+    char* env_reinsert = std::getenv("REINSERT");
+    if (env_reinsert != NULL){
+      flag = std::stoi(env_reinsert); //if we pass 0 it won't run
+    }
+    if (flag == 1){
+      for (int i = *ldc - 1; i >= 0; --i){
         if (row_to_remove[i]){
             for (int j = 0; j < *n; ++j){
                 *c_ptr = std::numeric_limits<float>::quiet_NaN();
@@ -428,7 +400,9 @@ We use these to prevent race conditions.
                 c_ptrLDA--;
             }
         }
+      }
     }
+    
     /*
     Method Two, using MEMCOPY
     To do so, we will need to create a new matrix with the same dimensions as the original matrix C.
