@@ -9,7 +9,7 @@ from nan_ops import NaNPool2d, NormalPool2d, NaNConv2d, NormalConv2d
 
 # todo uncomment if you want to get the nans
 # FILENAME = "..//sample_data//outp_bn3_1.pkl"
-FILENAME = "..//sample_data//0.5_decoder_output2_3.pkl" # output from maxpool
+FILENAME = "..//..//sample_data//skipped_count//ieee_encode1_1.pkl" # output from maxpool
 # Load the data from the pickle file
 data = pickle.load(open(FILENAME, 'rb'))
 
@@ -40,5 +40,5 @@ fig, axes = plt.subplots(1, 1, figsize=(7, 5))
 sns.heatmap(output_tensor_squeezed, ax=axes)
 axes.set_title('Convolution After NaN Pooling')
 
-plt.savefig('../plots/output_comparison.png')  # Save the plot
+plt.savefig('../../plots/output_comparison.png')  # Save the plot
 plt.close(fig)
