@@ -10,6 +10,9 @@ do
     OMP_NUM_THREADS=$i WRITE=1 FILENAME="convolution_cores_$i" python $executable
 done
 
+# One extra time for the core = 1 case
+OMP_NUM_THREADS=1 WRITE=1 FILENAME="convolution_cores_1" python $executable
+
 # Second we loop through images filled with nans of ratios 0, 0.25, 0.5, 0.75, 1
 for i in 0 0.25 0.5 0.75 0.99; do
     WRITE=1 FILENAME="convolution_nan_ratio_$i" FRACTION=$i python $executable

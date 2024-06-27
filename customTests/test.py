@@ -12,7 +12,7 @@ torch.manual_seed(42)
 size = 81
 sqrt_size = int(math.sqrt(size))
 # Determine how many elements should be NaN
-num_nans = size // 3
+num_nans = int(size*0.33)
 
 # Create a random permutation of the indices
 indices = torch.randperm(size)

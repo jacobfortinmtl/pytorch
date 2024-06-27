@@ -105,15 +105,24 @@ else:
 
     # Plotting the data
     plt.figure(figsize=(24, 14))
-    for label, (sizes, times) in data.items():
-        plt.plot(sizes, times, 'o-', label=label, markersize=4)
-    
+
+    # Choosing our colors since they appear too similar in the graph
+    distinct_colors = [
+        '#e6194B', '#3cb44b', '#ffe119', '#4363d8', '#f58231', 
+        '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', 
+        '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
+        '#00b3be'
+    ]
+
+    for i, (label, (sizes, times)) in enumerate(data.items()):
+        plt.plot(sizes, times, 'o-', label=label, markersize=4, color=distinct_colors[i % len(distinct_colors)])
+
     plt.title('Time taken for convolution vs. Size')
     plt.xlabel('Size')
     plt.ylabel('Time taken (seconds)')
     plt.legend()
     plt.grid(True)
     plt.ticklabel_format(style='plain', axis='x')  # Disable scientific notation on the x-axis
-    plt.rcParams['axes.prop_cycle'] = plt.cycler(color=plt.cm.tab10.colors)
+
     plt.savefig('../../plots/convolution_time_comparison.png')
     plt.show()
