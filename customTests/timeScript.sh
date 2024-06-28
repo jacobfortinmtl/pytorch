@@ -18,12 +18,17 @@ for i in 0 0.25 0.5 0.75 0.99; do
     WRITE=1 FILENAME="convolution_nan_ratio_$i" FRACTION=$i python $executable
 done
 
-# Second we loop through images filled with nans of ratios 0, 0.25, 0.5, 0.75, 1
+# Second we loop through images filled with nans of ratios 0, 0.25, 0.5, 0.75, 1, but no reinsertion
 for i in 0 0.25 0.5 0.75 0.99; do
     WRITE=1 FILENAME="convolution_nan_ratio_no_insert$i" REINSERT=0 FRACTION=$i python $executable
 done
 
+# # For plotting of number of rows removed
+# for i in 0 0.25 0.5 0.75 0.99; do
+#     echo "NaN Fraction in image $i"
+#     WRITE=1 FILENAME="convolution_nan_ratio_$i" FRACTION=$i python $executable
+# done
 
-# Ensure to use the executable variable when calling python3
+# Running default
 WRITE=1 FILENAME=convolution_torch_default DEFAULT=1 python3 $executable
 python3 $executable

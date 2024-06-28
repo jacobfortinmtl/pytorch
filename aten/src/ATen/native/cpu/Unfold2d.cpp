@@ -7,6 +7,7 @@
 #include <c10/util/irange.h>
 #include <ATen/native/cpu/utils.h>
 #include <cmath>
+#include <iostream>
 
 namespace at::native {
 
@@ -230,20 +231,30 @@ template <typename scalar_t>
 static void unfolded2d_copy(
     const scalar_t* input_data,
     scalar_t* finput_data,
-    int64_t kH,
-    int64_t kW,
-    int64_t dH,
+    int64_t kH, // Kernel Height size
+    int64_t kW, 
+    int64_t dH, // Stride
     int64_t dW,
-    int64_t padH,
+    int64_t padH, 
     int64_t padW,
-    int64_t n_input_plane,
+    int64_t n_input_plane, // Channels
     int64_t input_height,
     int64_t input_width,
     int64_t output_height,
     int64_t output_width) {
+      std::cout << "Unfolding implementation" << std::endl;
+      // Printing input data
+      std::cout<< "Input data: \n" << std::endl;
+      for (int i = 0; i < input_height; i++) {
+        for (int j = 0; j < input_width; j++) {
+          std::cout << input_data[i * input_width + j] << " ";
+        }
+        std::cout << std::endl;
+      }
   at::parallel_for(
       0, (int64_t)n_input_plane * kH * kW, 0, [&](int64_t start, int64_t end) {
         for (const auto k : c10::irange(start, end)) {
+          // these are indices not sizes for the flattened input!!!!!
           int64_t nip = k / (kH * kW);
           int64_t rest = k % (kH * kW);
           int64_t kh = rest / kW;
@@ -331,6 +342,13 @@ static void unfolded2d_copy(
           }
         }
       });
+    // printing unfolded data
+    std::cout << "Unfolded data (flat): \n" << std::endl;
+    int64_t total_size = n_input_plane * kH * kW * output_height * output_width;
+    for (int i = 0; i < total_size; i++) {
+      std::cout << finput_data[i] << " ";
+    }
+    std::cout << std::endl;
 }
 
 template <typename scalar_t>

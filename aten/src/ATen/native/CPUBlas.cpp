@@ -305,18 +305,18 @@ We use these to prevent race conditions.
     for (int i = 0; i < *m; ++i) {
         nan_count = 0;
         row_to_remove[i] = false;
-        for (int j = 0; j < *k; ++j) {
+        for (int j = 0; j < *k; ++j) { // k is num elements in the window
             if (std::isnan(a[j * (*lda) + i])) {
                 nan_count++;
                 if (nan_count > nan_threshold) {
                     row_to_remove[i] = true;
-                    new_m--;
                     rows_removed++;
                     break;
                 }
             }
         }
     }
+    new_m = *m - rows_removed;
     // Allocate memory for the new matrix
     float* new_a = new float[new_m * (*k)];
     int new_row = 0;
@@ -326,20 +326,19 @@ We use these to prevent race conditions.
     #pragma omp parallel for private(new_row)
     for (int j = 0; j < *k; ++j) {
         new_row = 0;
+        int lda_j = j * (*lda); // Precompute multiplication
+        int new_m_j = j * new_m;
         for (int i = 0; i < *m; ++i) {
-          if (!row_to_remove[i]) {
-              // if the value was supposed to be NaN, replace with 0
-              if (std::isnan(a[j * (*lda) + i])) {
-                  new_a[j * new_m + new_row] = 0;
-              }
-              else{
-                  new_a[j * new_m + new_row] = a[j * (*lda) + i];
-              }
-              new_row++;
-          }
+            if (!row_to_remove[i]) {
+                double value = a[lda_j + i];
+                // Directly assign to new_a, using ternary operator to check for NaN
+                new_a[new_m_j + new_row] = std::isnan(value) ? 0 : value;
+                new_row++;
+            }
         }
-      }
+    }
     // Setting the pointer of a to this new memory location and updating sizes
+    int old_m = *m;
     a = new_a;
     *m = new_m;
     *lda = new_m;
@@ -446,7 +445,8 @@ We use these to prevent race conditions.
     //     }
     //     std::cout << std::endl;
     // }
-    std::cout << "Rows removed: " << rows_removed << std::endl;
+    std::cout << "Number of initial windows: " << old_m << std::endl;
+    std::cout << "Convolutions skipped removed: " << rows_removed<< std::endl;
     delete[] new_a;
     //delete[] new_c; // TODO Uncomment if using method 2
     delete[] row_to_remove;

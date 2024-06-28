@@ -9,7 +9,7 @@ import pickle
 
 # Setting the seed for reproducibility
 torch.manual_seed(42)
-size = 81
+size = 16
 sqrt_size = int(math.sqrt(size))
 # Determine how many elements should be NaN
 num_nans = int(size*0.33)
