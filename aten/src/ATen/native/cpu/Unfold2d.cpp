@@ -245,12 +245,11 @@ static void unfolded2d_copy(
       std::cout << "Unfolding implementation" << std::endl;
       // Printing input data
       std::cout<< "Input data: \n" << std::endl;
-      for (int i = 0; i < input_height; i++) {
-        for (int j = 0; j < input_width; j++) {
-          std::cout << input_data[i * input_width + j] << " ";
-        }
-        std::cout << std::endl;
+      for (int i = 0; i < n_input_plane * input_height * input_width; i++) {
+        std::cout << input_data[i] << " ";
       }
+      std::cout << std::endl;
+
   at::parallel_for(
       0, (int64_t)n_input_plane * kH * kW, 0, [&](int64_t start, int64_t end) {
         for (const auto k : c10::irange(start, end)) {
@@ -326,17 +325,26 @@ static void unfolded2d_copy(
             for (y = 0; y < output_height; y++) {
               iy = (int64_t)y * dH + kh;
               ix = 0 + kw;
-              if (dW == 1)
-                memcpy(
-                    dst + (size_t)y * output_width,
-                    src + (size_t)iy * input_width + ix,
-                    sizeof(scalar_t) * output_width);
-              else {
-                for (x = 0; x < output_width; x++)
+              if (dW == 1) {
+                  std::cout << "Copying row from (" << iy << ", " << ix << "): ";
+                  for (int i = 0; i < output_width; i++) {
+                      std::cout << *(src + (size_t)iy * input_width + ix + i) << " ";
+                  }
+                  std::cout << std::endl;
                   memcpy(
-                      dst + (size_t)y * output_width + x,
-                      src + (size_t)iy * input_width + ix + (int64_t)x * dW,
-                      sizeof(scalar_t) * (1));
+                      dst + (size_t)y * output_width,
+                      src + (size_t)iy * input_width + ix,
+                      sizeof(scalar_t) * output_width);
+              }
+              else {
+                for (x = 0; x < output_width; x++) {
+                std::cout << "Copying element from (" << iy << ", " << (ix + x * dW) << "): ";
+                std::cout << *(src + (size_t)iy * input_width + ix + (int64_t)x * dW) << std::endl;
+                memcpy(
+                    dst + (size_t)y * output_width + x,
+                    src + (size_t)iy * input_width + ix + (int64_t)x * dW,
+                    sizeof(scalar_t) * (1));
+                }
               }
             }
           }
