@@ -31,4 +31,6 @@ done
 
 # Running default
 WRITE=1 FILENAME=convolution_torch_default DEFAULT=1 python3 $executable
+
+# Plotting
 python3 $executable

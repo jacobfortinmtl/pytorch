@@ -337,25 +337,15 @@ We use these to prevent race conditions.
             }
         }
     }
+    
     // Setting the pointer of a to this new memory location and updating sizes
     int old_m = *m;
     a = new_a;
     *m = new_m;
     *lda = new_m;
 
-    // TODO Uncomment to print
-    // std::cout << "Printing updated NaN removed matrix: " << std::endl;
-    // // printing the new a that is now filtered
-    // for (int i = 0; i < *m; i++) { //m = num rows A
-    //     std::cout << "Row " << i << ": ";
-    //     for (int j = 0; j < *k; j++) { //k = common dimension
-    //         int index = j * *lda + i;
-    //         std::cout << a[index] << " ";
-    //     }
-    //     std::cout << std::endl;
-    // } 
-        //Calling sgemm_
-        // Need to send pointers since we're using the passed arguments
+    //Calling sgemm_
+    // Need to send pointers since we're using the passed arguments
     sgemm_(
         transa, transb,
         m, n, k,
@@ -401,50 +391,7 @@ We use these to prevent race conditions.
         }
       }
     }
-    
-    /*
-    Method Two, using MEMCOPY
-    To do so, we will need to create a new matrix with the same dimensions as the original matrix C.
-    We will need to keep two pointers, one for the original matrix C and one in A, and iterate through the rows of C.
-    If a row was marked for removal, we will add NaNs to the row in C. Else, we will add the value that was
-    already in C.
-    Best = Worst: O(n) time complexity and 2 copies.
-    note: we are assuming that the matrix C is in column-major order, so no need calculate index
-    */
-  
-    // float* new_c = new float[*ldc * *n];
-    // float* c_ptr = c;
-    // float* new_c_ptr = new_c;
-    // // Pointer to keep track of where we are in C, C is written back in column-major order
-    // for (int i = 0; i < *ldc; ++i) {
-    //     if (row_to_remove[i]) {
-    //         for (int j = 0; j < *n; ++j) {
-    //             *new_c_ptr = -1; // testing with -1 first, then im going to replace w/ std::nanf("");
-    //             new_c_ptr++;
-    //         }
-    //     } else {
-    //         for (int j = 0; j < *n; ++j) {
-    //             *new_c_ptr = *c_ptr;
-    //             new_c_ptr++;
-    //             c_ptr++;
-    //         }
-    //     }
-    // }
-    // // Copying over. Cant just change the pointer without changing a bunch of fct def
-    // memcpy(c, new_c, sizeof(float) * (*ldc) * (*n));
-    
-    
-    // TODO uncommment to print  new C
-    // std::cout << std::endl;
-    // std::cout << "Printing after insertion " << std::endl;
-    // for (int i = 0; i < *ldc; i++) { //m = num rows A
-    //     std::cout << "Row " << i << ": ";
-    //     for (int j = 0; j < *n; j++) { //k = common dimension
-    //         int index = j * *ldc + i;
-    //         std::cout << c[index] << " ";
-    //     }
-    //     std::cout << std::endl;
-    // }
+
     std::cout << "Number of initial windows: " << old_m << std::endl;
     std::cout << "Convolutions skipped removed: " << rows_removed<< std::endl;
     delete[] new_a;

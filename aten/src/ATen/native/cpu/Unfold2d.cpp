@@ -242,14 +242,27 @@ static void unfolded2d_copy(
     int64_t input_width,
     int64_t output_height,
     int64_t output_width) {
-      std::cout << "Unfolding implementation" << std::endl;
-      // Printing input data
-      std::cout<< "Input data: \n" << std::endl;
-      for (int i = 0; i < n_input_plane * input_height * input_width; i++) {
-        std::cout << input_data[i] << " ";
-      }
-      std::cout << std::endl;
-
+      // std::cout << "Unfolding implementation" << std::endl;
+      // // Printing input data
+      // std::cout<< "Input data: " << std::endl;
+      // for (int i = 0; i < n_input_plane * input_height * input_width; i++) {
+      //   std::cout << input_data[i] << " ";
+      // }
+      // std::cout << std::endl;
+      // std::cout << std::endl;
+      // // Printing passed parameters
+      // std::cout << "kH: " << kH << std::endl;
+      // std::cout << "kW: " << kW << std::endl;
+      // std::cout << "dH: " << dH << std::endl;
+      // std::cout << "dW: " << dW << std::endl;
+      // std::cout << "padH: " << padH << std::endl;
+      // std::cout << "padW: " << padW << std::endl;
+      // std::cout << "n_input_plane: " << n_input_plane << std::endl;
+      // std::cout << "input_height: " << input_height << std::endl;
+      // std::cout << "input_width: " << input_width << std::endl;
+      // std::cout << "output_height: " << output_height << std::endl;
+      // std::cout << "output_width: " << output_width << std::endl;
+      // std::cout << std::endl;
   at::parallel_for(
       0, (int64_t)n_input_plane * kH * kW, 0, [&](int64_t start, int64_t end) {
         for (const auto k : c10::irange(start, end)) {
@@ -326,11 +339,11 @@ static void unfolded2d_copy(
               iy = (int64_t)y * dH + kh;
               ix = 0 + kw;
               if (dW == 1) {
-                  std::cout << "Copying row from (" << iy << ", " << ix << "): ";
-                  for (int i = 0; i < output_width; i++) {
-                      std::cout << *(src + (size_t)iy * input_width + ix + i) << " ";
-                  }
-                  std::cout << std::endl;
+                  // std::cout << "Copying row from (" << iy << ", " << ix << "): ";
+                  // for (int i = 0; i < output_width; i++) {
+                  //     std::cout << *(src + (size_t)iy * input_width + ix + i) << " ";
+                  // }
+                  // std::cout << std::endl;
                   memcpy(
                       dst + (size_t)y * output_width,
                       src + (size_t)iy * input_width + ix,
@@ -338,8 +351,8 @@ static void unfolded2d_copy(
               }
               else {
                 for (x = 0; x < output_width; x++) {
-                std::cout << "Copying element from (" << iy << ", " << (ix + x * dW) << "): ";
-                std::cout << *(src + (size_t)iy * input_width + ix + (int64_t)x * dW) << std::endl;
+                // std::cout << "Copying element from (" << iy << ", " << (ix + x * dW) << "): ";
+                // std::cout << *(src + (size_t)iy * input_width + ix + (int64_t)x * dW) << std::endl;
                 memcpy(
                     dst + (size_t)y * output_width + x,
                     src + (size_t)iy * input_width + ix + (int64_t)x * dW,
@@ -351,12 +364,22 @@ static void unfolded2d_copy(
         }
       });
     // printing unfolded data
-    std::cout << "Unfolded data (flat): \n" << std::endl;
-    int64_t total_size = n_input_plane * kH * kW * output_height * output_width;
-    for (int i = 0; i < total_size; i++) {
-      std::cout << finput_data[i] << " ";
-    }
-    std::cout << std::endl;
+    // std::cout << "Unfolded data (flat): \n" << std::endl;
+    // int64_t total_size = n_input_plane * kH * kW * output_height * output_width;
+    // for (int i = 0; i < total_size; i++) {
+    //   std::cout << finput_data[i] << " ";
+    // }
+    // std::cout << std::endl;
+    // // Printing col major order
+    // int height_col_size = output_height*output_width;
+    // for (int i = 0; i < height_col_size; i++) { //m = num rows A
+    //     std::cout << "Row " << i << ": ";
+    //     for (int j = 0; j < output_width; j++) { //k = common dimension
+    //         int index = j * height_col_size + i;
+    //         std::cout << finput_data[index] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // } 
 }
 
 template <typename scalar_t>
