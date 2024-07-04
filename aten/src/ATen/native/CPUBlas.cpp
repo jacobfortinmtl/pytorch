@@ -1,4 +1,5 @@
 #define TORCH_ASSERT_ONLY_METHOD_OPERATORS
+#include <chrono>
 #include <ATen/core/Tensor.h>
 #include <ATen/Dispatch.h>
 #include <ATen/NamedTensorUtils.h>
@@ -301,6 +302,8 @@ void preprocessing(
 Private vs reduction, both create copies but those in private are not aggragated at the end, but rather discarded. 
 We use these to prevent race conditions.
 */
+    // Adding time counters
+    auto start = std::chrono::high_resolution_clock::now();
     #pragma omp parallel for reduction(+:rows_removed) reduction(-:new_m) private (nan_count)
     for (int i = 0; i < *m; ++i) {
         nan_count = 0;
@@ -316,6 +319,9 @@ We use these to prevent race conditions.
             }
         }
     }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "Time taken to identify windows: " << elapsed.count() << "s" << std::endl;
     new_m = *m - rows_removed;
     // Allocate memory for the new matrix
     float* new_a = new float[new_m * (*k)];
@@ -323,6 +329,8 @@ We use these to prevent race conditions.
 
     // Write the new matrix in column-major order
     // Parelleliztion
+
+    auto start2 = std::chrono::high_resolution_clock::now();
     #pragma omp parallel for private(new_row)
     for (int j = 0; j < *k; ++j) {
         new_row = 0;
@@ -337,7 +345,9 @@ We use these to prevent race conditions.
             }
         }
     }
-    
+    auto end2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed2 = end2 - start2;
+    std::cout << "Time taken to copy windows: " << elapsed2.count() << "s" << std::endl;
     // Setting the pointer of a to this new memory location and updating sizes
     int old_m = *m;
     a = new_a;
@@ -346,6 +356,8 @@ We use these to prevent race conditions.
 
     //Calling sgemm_
     // Need to send pointers since we're using the passed arguments
+
+    auto start3 = std::chrono::high_resolution_clock::now();
     sgemm_(
         transa, transb,
         m, n, k,
@@ -354,7 +366,9 @@ We use these to prevent race conditions.
         b, ldb,
         beta,
         c, ldc);
-    
+    auto end3 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed3 = end3 - start3;
+    std::cout << "Time taken to perform sgemm_: " << elapsed3.count() << "s" << std::endl;
     /*
     Method 1: Right-to left in-place NaN insertions.
     To do so, we will keep two pointers in Matrix C and iterate from right to left. The first pointer will point to index *lda - 1. 
@@ -375,6 +389,7 @@ We use these to prevent race conditions.
     if (env_reinsert != NULL){
       flag = std::stoi(env_reinsert); //if we pass 0 it won't run
     }
+    auto start4 = std::chrono::high_resolution_clock::now();
     if (flag == 1){
       for (int i = *ldc - 1; i >= 0; --i){
         if (row_to_remove[i]){
@@ -391,7 +406,10 @@ We use these to prevent race conditions.
         }
       }
     }
-
+    auto end4 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed4 = end4 - start4;
+    std::cout << "Time taken to re-insert NaNs: " << elapsed4.count() << "s" << std::endl;
+    std::cout << std::endl;
     std::cout << "Number of initial windows: " << old_m << std::endl;
     std::cout << "Convolutions skipped removed: " << rows_removed<< std::endl;
     delete[] new_a;
