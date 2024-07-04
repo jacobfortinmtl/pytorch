@@ -371,16 +371,16 @@ void preprocessing(
     // std::cout << "Time taken to perform sgemm_: " << elapsed3.count() << "s" << std::endl;
     /*
     Method 1: Right-to left in-place NaN insertions.
-    To do so, we will keep two pointers in Matrix C and iterate from right to left. The first pointer will point to index *lda - 1. 
-    The second will point to C + *lda * *n - 1. If the value in the row is NaN, we will insert NaNs at the second pointer. Else, we will
+    To do so, we will keep two pointers in Matrix C and iterate from right to left. The first pointer will point to index c + *lda * *n - 1. 
+    The second will point to C + *ldc * *n - 1. Recall, lda < ldc since we adjust lda earlier. If the value in the row is NaN, we will insert NaNs at the second pointer. Else, we will
     insert at the second pointer, the value pointed by the first pointer. 
     Best Case: 1 copy, O(n) time complexity
     Worst Case: 1 full copy, O(n) time complexity
     */
     // Pointer 1: End of matrix C
     float* c_ptr = c + *ldc * *n - 1;
-    // Pointer 2: At index *lda - 1
-    float* c_ptrLDA = c + *lda - 1;
+    // Pointer 2: At index *lda - 1, which is the end of 
+    float* c_ptrLDA = c + *lda* *n - 1;
 
     // Algorithm
     // check if envrinoment variable specifies re-insertion

@@ -23,7 +23,7 @@ input_tensor = input_tensor.float()
 input_tensor[indices[:num_nans]] = float('nan')
 
 # Reshape the tensor back to its original shape
-input_tensor = input_tensor.reshape(1, 1, sqrt_size, sqrt_size)
+input_tensor = input_tensor.reshape(2, 2, sqrt_size, sqrt_size)
 
 print("Input Tensor: ")
 print(input_tensor)
