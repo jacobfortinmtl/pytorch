@@ -9,7 +9,7 @@ import pickle
 
 # Setting the seed for reproducibility
 torch.manual_seed(42)
-size = 5**2
+size = 4**2
 sqrt_size = int(math.sqrt(size))
 # Determine how many elements should be NaN
 num_nans = int(size*0.33)
@@ -20,17 +20,17 @@ input_tensor = torch.arange(1, size + 1)
 # Convert the integer tensor to float
 input_tensor = input_tensor.float()
 # Set the elements at the indices to NaN
-input_tensor[indices[:num_nans]] = float('nan')
+# input_tensor[indices[:num_nans]] = float('nan') #TODO UNCOMMENT FOR NANS
 
 # Reshape the tensor back to its original shape
-input_tensor = input_tensor.reshape(2, 2, sqrt_size, sqrt_size)
+input_tensor = input_tensor.reshape(1, 1, sqrt_size, sqrt_size)
 
 print("Input Tensor: ")
 print(input_tensor)
 print()
 
 # Create a random weights tensor of integers
-weight = torch.ones(1, 1, 2, 2)
+weight = torch.ones(1, 1, 3, 3)
 
 # Convert the integer tensor to float
 weight = weight.float()
@@ -52,4 +52,4 @@ print(output_tensor.shape)
 
 # Print elapsed time
 # print(f"Time taken for convolution: {elapsed_time} seconds")
-print("End of call ---- \n")
+# print("End of call ---- \n")

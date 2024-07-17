@@ -286,86 +286,107 @@ void preprocessing(
     float* alpha, const float* a, int* lda, const float* b, int* ldb, 
     float* beta, float* c, int* ldc) 
 {
-    // Get threshold from environment variable
-    int nan_threshold = 2; // defaults to 2
-    char* env_threshold = std::getenv("THRESHOLD");
-    if (env_threshold != NULL){
-      nan_threshold = std::stoi(env_threshold);
+    //printing the input
+    std::cout << "transa " << *transa << std::endl;
+    std::cout << "transb " << *transb << std::endl;
+    std::cout << "m " << *m << std::endl;
+    std::cout << "n " << *n << std::endl;
+    std::cout << "k " << *k << std::endl;
+    std::cout << "lda " << *lda << std::endl;
+    std::cout << "ldb " << *ldb << std::endl;
+    std::cout << "ldc " << *ldc << std::endl;
+    
+    //printing the input matrices
+    std::cout << std::endl;
+    std::cout << "Matrix A: " << std::endl;
+    for (int i = 0; i < *m * *k; ++i) {
+      std::cout << a[i] << " ";
     }
-    bool* row_to_remove = new bool[*m];
-    int rows_removed = 0;
-    int nan_count = 0;
-    int new_m = *m;
-
-    // Identify rows to remove
-    /* Parallelizing the outer for loop using OpenMP
-    Private vs reduction, both create copies but those in private are not aggragated at the end, but rather discarded. 
-    We use these to prevent race conditions.
-    */
-    // Adding time counters
-    // auto start = std::chrono::high_resolution_clock::now();
-    #pragma omp parallel for reduction(+:rows_removed) private (nan_count)
-    for (int i = 0; i < *m; ++i) {
-        nan_count = 0;
-        row_to_remove[i] = false;
-        for (int j = 0; j < *k; ++j) { // k is num elements in the window
-            if (std::isnan(a[j * (*lda) + i])) {
-                nan_count++;
-                if (nan_count > nan_threshold) {
-                    row_to_remove[i] = true;
-                    rows_removed++;
-                    break;
-                }
-            }
-        }
-    }
-    // auto end = std::chrono::high_resolution_clock::now();
-    // std::chrono::duration<double> elapsed = end - start;
-    // std::cout << "Time taken to identify windows: " << elapsed.count() << "s" << std::endl;
-
-    // auto start2 = std::chrono::high_resolution_clock::now();
-    // Determining the new index for each column
-    int* new_index = new int[*m];
-    int new_row_tracker = 0;
-    for (int i = 0; i < *m; ++i) {
-      new_index[i] = !row_to_remove[i] ? new_row_tracker++ : -1;
+    std::cout << std::endl;
+    std::cout << "Matrix B" << std::endl;
+    for (int i = 0; i < *k; ++i) {
+      std::cout << b[i] << " ";
     }
 
-    new_m = *m - rows_removed;
-    // Allocate memory for the new matrix
-    float* new_a = new float[new_m * (*k)];
+    // int nan_threshold = 2; // defaults to 2
+    // char* env_threshold = std::getenv("THRESHOLD");
+    // if (env_threshold != NULL){
+    //   nan_threshold = std::stoi(env_threshold);
+    // }
+    // bool* col_to_remove = new bool[*m];
+    // int col_removed = 0;
+    // int nan_count = 0;
+    // int new_m = *m;
 
-    // Write the new matrix in column-major order
-    #pragma omp parallel for
-    for (int i = 0; i < *m; ++i) {
-      if (new_index[i] != -1) {
-        for (int j = 0; j < *k; ++j) {
-          // checking if we're inserting NaNs
-          new_a[new_index[i] + j * new_m] = std::isnan(a[i + j * (*lda)]) ? 0 : a[i + j * (*lda)];
-        }
-      }
-    }
-    // auto end2 = std::chrono::high_resolution_clock::now();
-    // std::chrono::duration<double> elapsed2 = end2 - start2;
-    // std::cout << "Time taken to copy windows: " << elapsed2.count() << "s" << std::endl;
-    // Setting the pointer of a to this new memory location and updating sizes
-    int old_m = *m;
-    a = new_a;
-    *m = new_m;
-    *lda = new_m;
+    // // Identify rows to remove
+    // /* Parallelizing the outer for loop using OpenMP
+    // Private vs reduction, both create copies but those in private are not aggragated at the end, but rather discarded. 
+    // We use these to prevent race conditions.
+    // */
+    // // Adding time counters
+    // // auto start = std::chrono::high_resolution_clock::now();
+    // #pragma omp parallel for reduction(+:col_removed) private (nan_count)
+    // for (int i = 0; i < *m; ++i) {
+    //     nan_count = 0;
+    //     col_to_remove[i] = false;
+    //     for (int j = 0; j < *k; ++j) { // k is num elements in the window
+    //         if (std::isnan(a[j * (*lda) + i])) {
+    //             nan_count++;
+    //             if (nan_count > nan_threshold) {
+    //                 col_to_remove[i] = true;
+    //                 col_removed++;
+    //                 break;
+    //             }
+    //         }
+    //     }
+    // }
+    // // auto end = std::chrono::high_resolution_clock::now();
+    // // std::chrono::duration<double> elapsed = end - start;
+    // // std::cout << "Time taken to identify windows: " << elapsed.count() << "s" << std::endl;
+
+    // // auto start2 = std::chrono::high_resolution_clock::now();
+    // // Determining the new index for each column
+    // int* new_index = new int[*m];
+    // int new_row_tracker = 0;
+    // for (int i = 0; i < *m; ++i) {
+    //   new_index[i] = !col_to_remove[i] ? new_row_tracker++ : -1;
+    // }
+
+    // new_m = *m - col_removed;
+    // // Allocate memory for the new matrix
+    // float* new_a = new float[new_m * (*k)];
+
+    // // Write the new matrix in column-major order
+    // #pragma omp parallel for
+    // for (int i = 0; i < *m; ++i) {
+    //   if (new_index[i] != -1) {
+    //     for (int j = 0; j < *k; ++j) {
+    //       // checking if we're inserting NaNs
+    //       new_a[new_index[i] + j * new_m] = std::isnan(a[i + j * (*lda)]) ? 0 : a[i + j * (*lda)];
+    //     }
+    //   }
+    // }
+    // // auto end2 = std::chrono::high_resolution_clock::now();
+    // // std::chrono::duration<double> elapsed2 = end2 - start2;
+    // // std::cout << "Time taken to copy windows: " << elapsed2.count() << "s" << std::endl;
+    // // Setting the pointer of a to this new memory location and updating sizes
+    // int old_m = *m;
+    // a = new_a;
+    // *m = new_m;
+    // *lda = new_m;
 
     //Calling sgemm_
     // Need to send pointers since we're using the passed arguments
 
     // auto start3 = std::chrono::high_resolution_clock::now();
-    sgemm_(
+    sgemm_( //have to play around with the variables being sent if we dont want to change in torch where they calculate these
         transa, transb,
-        m, n, k,
+        n, m, k,
         alpha,
-        a, lda,
-        b, ldb,
+        b, n,
+        a, ldb,
         beta,
-        c, ldc);
+        c, n);
     // auto end3 = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double> elapsed3 = end3 - start3;
     // std::cout << "Time taken to perform sgemm_: " << elapsed3.count() << "s" << std::endl;
@@ -378,43 +399,43 @@ void preprocessing(
     Worst Case: 1 full copy, O(n) time complexity
     */
     // Pointer 1: End of matrix C
-    float* c_ptr = c + *ldc * *n - 1;
-    // Pointer 2: At index *lda - 1, which is the end of 
-    float* c_ptrLDA = c + *lda* *n - 1;
+    // float* c_ptr = c + *ldc * *n - 1;
+    // // Pointer 2: At index *lda - 1, which is the end of 
+    // float* c_ptrLDA = c + *lda* *n - 1;
 
-    // Algorithm
-    // check if envrinoment variable specifies re-insertion
-    int flag = 1; // defaults to running
-    char* env_reinsert = std::getenv("REINSERT");
-    if (env_reinsert != NULL){
-      flag = std::stoi(env_reinsert); //if we pass 0 it won't run
-    }
-    // auto start4 = std::chrono::high_resolution_clock::now();
-    if (flag == 1){
-      for (int i = *ldc - 1; i >= 0; --i){
-        if (row_to_remove[i]){
-            for (int j = 0; j < *n; ++j){
-                *c_ptr = std::numeric_limits<float>::quiet_NaN();
-                c_ptr--;
-            }
-        } else {
-            for (int j = 0; j < *n; ++j){
-                *c_ptr = *c_ptrLDA;
-                c_ptr--;
-                c_ptrLDA--;
-            }
-        }
-      }
-    }
-    // auto end4 = std::chrono::high_resolution_clock::now();
-    // std::chrono::duration<double> elapsed4 = end4 - start4;
-    // std::cout << "Time taken to re-insert NaNs: " << elapsed4.count() << "s" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Number of initial windows: " << old_m << std::endl;
-    std::cout << "Convolutions skipped removed: " << rows_removed<< std::endl;
-    delete[] new_a;
-    delete[] new_index;
-    delete[] row_to_remove;
+    // // Algorithm
+    // // check if envrinoment variable specifies re-insertion
+    // int flag = 1; // defaults to running
+    // char* env_reinsert = std::getenv("REINSERT");
+    // if (env_reinsert != NULL){
+    //   flag = std::stoi(env_reinsert); //if we pass 0 it won't run
+    // }
+    // // auto start4 = std::chrono::high_resolution_clock::now();
+    // if (flag == 1){
+    //   for (int i = *ldc - 1; i >= 0; --i){
+    //     if (col_to_remove[i]){
+    //         for (int j = 0; j < *n; ++j){
+    //             *c_ptr = std::numeric_limits<float>::quiet_NaN();
+    //             c_ptr--;
+    //         }
+    //     } else {
+    //         for (int j = 0; j < *n; ++j){
+    //             *c_ptr = *c_ptrLDA;
+    //             c_ptr--;
+    //             c_ptrLDA--;
+    //         }
+    //     }
+    //   }
+    // }
+    // // auto end4 = std::chrono::high_resolution_clock::now();
+    // // std::chrono::duration<double> elapsed4 = end4 - start4;
+    // // std::cout << "Time taken to re-insert NaNs: " << elapsed4.count() << "s" << std::endl;
+    // std::cout << std::endl;
+    // std::cout << "Number of initial windows: " << old_m << std::endl;
+    // std::cout << "Convolutions skipped removed: " << col_removed<< std::endl;
+    // delete[] new_a;
+    // delete[] new_index;
+    // delete[] col_to_remove;
 }
 
 
