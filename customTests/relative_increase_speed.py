@@ -1,62 +1,67 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
+import math
+import torch
+import torch.nn.functional as F
+import numpy as np
+import time
+import pickle
+import sys
+import os
 
-# Read the data from the file
+# open file for writing
+
+# Open file for writing
 file_path = '../../plots/relative_increase.txt'
-sizes = []
-identify_times = []
-copy_times = []
-sgemm_times = []
-reinsert_nans_times = []
 
-with open(file_path, 'r') as file:
-    for line in file:
-        if "Size:" in line:
-            size = int(re.findall(r'\d+', line)[0])
-            sizes.append(size)
-        elif "Time taken to identify windows" in line:
-            identify_times.append(float(re.findall(r'[\d.]+', line)[0]))
-        elif "Time taken to copy windows" in line:
-            copy_times.append(float(re.findall(r'[\d.]+', line)[0]))
-        elif "Time taken to perform sgemm_" in line:
-            sgemm_times.append(float(re.findall(r'[\d.]+', line)[0]))
-        elif "Time taken to re-insert NaNs" in line:
-            reinsert_nans_times.append(float(re.findall(r'[\d.]+', line)[0]))
+choice = int(os.getenv('DEFAULT', '0'))
 
-# Create a DataFrame
-data = {
-    'Size': sizes,
-    'Time to identify windows': identify_times,
-    'Time to copy windows': copy_times,
-    'Time to perform sgemm_': sgemm_times,
-    'Time to re-insert NaNs': reinsert_nans_times
-}
-df = pd.DataFrame(data)
+if choice == 0:
+    torch.manual_seed(42)
+    # Get size from environment variable, with a default value if not set
+    size = int(os.getenv('SIZE', '4'))**2  # Use the environment variable SIZE
 
-# Calculate the mean times for each size
-mean_times = df.groupby('Size').mean().reset_index()
-# printing mean times
-print(mean_times)
+    sqrt_size = int(math.sqrt(size))
+    num_nans = int(size * 0.33)
 
-fig, ax = plt.subplots(figsize=(10, 6))
+    indices = torch.randperm(size)
+    input_tensor = torch.arange(1, size + 1)
+    input_tensor = input_tensor.float()
+    input_tensor[indices[:num_nans]] = float('nan')
 
-# Plot each time category
-categories = ['Time to identify windows', 'Time to copy windows', 'Time to perform sgemm_', 'Time to re-insert NaNs']
-for category in categories:
-    ax.plot(mean_times['Size'], mean_times[category], label=category)
+    input_tensor = input_tensor.reshape(1, 1, sqrt_size, sqrt_size)
 
-ax.set_xlabel('Size')
-ax.set_ylabel('Time (s)')
-ax.set_title('Average Time Taken for Different Functions by Input Size')
-ax.legend()
+    weight = torch.ones(1, 1, 2, 2)
+    weight = weight.float()
 
-# Add the DataFrame as text below the plot
-text_str = mean_times.to_string(index=False, col_space=40)
-plt.figtext(0.5, -0.1, text_str, ha="center", fontsize=9, va="top")
+    print("Size: ", sqrt_size**2)
+    start_time = time.time()
+    output_tensor = torch.nn.functional.conv2d(input_tensor, weight, padding=0)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    # print("Time taken for whole default", elapsed_time)
+elif choice == 1:
+    torch.manual_seed(42)
+    # Get size from environment variable, with a default value if not set
+    size = int(os.getenv('SIZE', '4'))**2  # Use the environment variable SIZE
 
-plt.tight_layout()
+    sqrt_size = int(math.sqrt(size))
+    num_nans = int(size * 0.33)
 
-# Save the plot
-plt.savefig("../../plots/average_time_functions_by_size.png", bbox_inches='tight')
-plt.show()
+    indices = torch.randperm(size)
+    input_tensor = torch.arange(1, size + 1)
+    input_tensor = input_tensor.float()
+    input_tensor[indices[:num_nans]] = float('nan')
+
+    input_tensor = input_tensor.reshape(1, 1, sqrt_size, sqrt_size)
+
+    weight = torch.ones(1, 1, 2, 2)
+    weight = weight.float()
+
+    print("Size: ", sqrt_size**2)
+    start_time = time.time()
+    output_tensor = torch.nn.functional.conv2d(input_tensor, weight, padding=0)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print("Time taken for whole default", elapsed_time)

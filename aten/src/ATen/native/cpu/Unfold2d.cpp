@@ -11,6 +11,7 @@
 #include <cstdlib> // For std::getenv
 #include <string>  // For std::stoi
 #include <iostream> // For std::cout
+#include <chrono>
 
 namespace at::native {
 
@@ -246,80 +247,76 @@ static void unfolded2d_copy(
     int64_t output_height,
     int64_t output_width) {
     // Getting an env variable to check for for folding
+    // starting time calculation
+    
     int flag = 1;
-    char* col_major = std::getenv("COL_MAJOR");
-    if(col_major != NULL){
-        flag = std::stoi(col_major); //if we pass 0 it won't run
+    char* env_var = std::getenv("DEFAULT");
+    if (env_var != NULL && std::string(env_var) == "1") {
+      flag = 0;
     }
     if (flag == 1){
-      std::cout << "Using row major order for im2col" << std::endl;
+      auto start = std::chrono::high_resolution_clock::now();
+      // std::cout << "Using row major order for im2col" << std::endl;
       std::cout << std::endl;
       const scalar_t* src = input_data;
       scalar_t* dest = finput_data;
-      int kernel_offset = 0;
       /* Option to create the memory storage of im2col in row major order.
       Not every row in the input will appear in windows the same amount of times.
       Namely, given a N x N matrix, and kernel of k x k,  
       rows from r = 1 to r = n - k + 1 will appear n - k + 1 times
       */
-
-      /*
-      Also, to keep track where to calculate the next windows, we keep a pointer the end of the current window of where we last added a row.
-      Hence, we don't need a formula that includes the kernel size to calculate the offset. We just add after the respective pointer.
-      */
-      scalar_t** new_index = new scalar_t*[output_height * output_width];
-      int indexer = 0; // since the pattern of adding is always the same, we can simply use an indexer
-
-      for (int rowsKernel = 0; rowsKernel < kH; rowsKernel++) {
-        indexer = 0;
+      // //printing destination after first loop
+      // std::cout << "Unfolded data (flat): \n" << std::endl;
+      // int64_t total_size = n_input_plane * kH * kW * output_height * output_width;
+      // for (int i = 0; i < total_size; i++) {
+      //   std::cout << dest_start[i] << " ";
+      // }
+      // // Priting what value all the pointers in new_index are pointing at
+      // for (int i = 0; i < output_height * output_width; i++) {
+      //   std::cout << "Index " << i << " is pointing at: " << *(new_index[i]-1) << std::endl;
+      // }
+      int offset = 0;
+      
+      for (int rowsKernel = 0; rowsKernel < kH; rowsKernel++) { //start at first row since row one started above
         for (int ip = 0; ip < n_input_plane; ip++) { // looping through channels
+          #pragma omp parallel for private (src, dest) collapse(2)
           for (int ow = 0; ow < output_width; ow++) {
             for(int oh = 0; oh < input_height; oh++) {
               // Checking if current row in input can be a top row of a window
               // e.g., with a 2x2 kernel, the bottom row cannot be the top row of a window
               if (oh - rowsKernel >= output_height) {
                 continue;
-              } // Checking it current row in input can be a bottom row of a window, should
+              } 
+              // Checking it current row in input can be a bottom row of a window, should
               // fail for the first row
               else if (oh - rowsKernel < 0) { 
                 continue;
               }
-              if (rowsKernel == 0){
-                src = 
-                  input_data + ip * input_height * input_width + oh * input_width + ow;
-                dest = 
-                  (finput_data + 
-                  ip * kH * kW * output_height * output_width + // not sure if channels work
-                  ow * kH*kH + oh * kH * kW * output_width -
-                  kernel_offset);
-                memcpy(dest, src, kW * sizeof(scalar_t));
-                
-                // Adding the pointer to the end
-                new_index[indexer] = dest + kW;
-                indexer++;
-              }
-              else{
-                src = input_data + ip * input_height * input_width + oh * input_width + ow;
-                dest = new_index[indexer];
-                memcpy(dest, src, kW * sizeof(scalar_t));
-                new_index[indexer] = dest + kW;
-                indexer++;
-              }
-                // Printing (rowKernel, ow, oh)
-                std::cout << "Copying from (" << rowsKernel << ", " << oh << ", " << ow << "): " << std::endl;
-                // Printing src offset
-                std::cout << "Offset SRC: " << ip * input_height * input_width + oh * input_height + ow << std::endl;
-                // Printing dest offset
-                std::cout << "Offset DEST: " << ip * kH * kW * output_height * output_width + // not sure if channels work
-                  ow * kH*kH + oh * kH * kW * output_width -
-                  (rowsKernel != 0 ? (rowsKernel * (output_width * output_height) + 1) : 0) << std::endl;
+              offset = rowsKernel*(output_width*kH*kW - kW); //every row needs to be offset to the left
+              src = 
+                input_data + ip * input_height * input_width + oh * input_width + ow;
+              dest = 
+                (finput_data + 
+                ip * kH * kW * output_height * output_width + // not sure if channels work
+                ow * kH*kH + oh * kH * kW * output_width - offset);
+              // Printing the current indexing of rowskernel, ow, oh
+              // std::cout << "Indexing: Rows: " << rowsKernel << ", oh:" << oh << ", OW: " << ow << std::endl;
+              // // Printing the current src and dest pointers
+              // std::cout << "Src: " << ip * input_height * input_width + oh * input_width + ow 
+              // << ", Dest: " << ip * kH * kW * output_height * output_width + // not sure if channels work
+              //   ow * kH*kH + oh * kH * kW * output_width - offset << std::endl;
+              // std::cout << "Offset: " << offset << std::endl;
+              memcpy(dest, src, kW * sizeof(scalar_t));
             }
           }
         }
       }
-      delete[] new_index;
+      auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        std::cout << "Time taken for im2ROW: " << elapsed.count() << " s" << std::endl;
     }
     else{
+        auto start = std::chrono::high_resolution_clock::now();
         at::parallel_for(
         0, (int64_t)n_input_plane * kH * kW, 0, [&](int64_t start, int64_t end) {
           for (const auto k : c10::irange(start, end)) {
@@ -420,6 +417,9 @@ static void unfolded2d_copy(
             }
           }
         });
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        std::cout << "Time taken for im2COL: " << elapsed.count() << " s" << std::endl;
   }
   
     // printing unfolded data

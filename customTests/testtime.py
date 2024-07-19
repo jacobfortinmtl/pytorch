@@ -149,5 +149,5 @@ else:
     axs[1].set_xlim(0, 500)  # Set maximum x-axis value to 500
     axs[1].set_ylim(0, 0.01)  # Set maximum y-axis value to 1000
 
-    plt.savefig('../../plots/convolution_time_comparison_subplots.png')
+    plt.savefig('../../plots/convolution_time_comparison_subplots_row_major.png')
     plt.show()

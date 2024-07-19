@@ -1,4 +1,16 @@
-for i in {0..10} 
-do
-    python test.py >> ../../plots/relative_increase.txt
+sizes=(250 500 750 1000)
+
+# Wipes the file before appending
+> ../../plots/relative_increase.txt
+# Loop over each size
+for size in "${sizes[@]}"; do
+  for i in {1..10}; do
+    SIZE=$size python relative_increase_speed.py >> ../../plots/relative_increase.txt
+  done
 done
+for size in "${sizes[@]}"; do
+  for i in {1..10}; do
+    SIZE=$size DEFAULT=1 python relative_increase_speed.py >> ../../plots/relative_increase_windows.txt
+  done
+done
+python relative_increase_speed_plotting.py
