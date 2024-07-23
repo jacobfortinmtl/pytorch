@@ -251,7 +251,11 @@ static void unfolded2d_copy(
     
     int flag = 1;
     char* env_var = std::getenv("DEFAULT");
+    char* env_var_conv = std::getenv("CONVERSION");
     if (env_var != NULL && std::string(env_var) == "1") {
+      flag = 0;
+    }
+    if (env_var_conv != NULL && std::string(env_var_conv) == "1") {
       flag = 0;
     }
     if (flag == 1){
@@ -313,7 +317,7 @@ static void unfolded2d_copy(
       }
       auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;
-        std::cout << "Time taken for im2ROW: " << elapsed.count() << " s" << std::endl;
+        std::cout << "Time taken for im2ROW: " << elapsed.count() << std::endl;
     }
     else{
         auto start = std::chrono::high_resolution_clock::now();
@@ -419,7 +423,7 @@ static void unfolded2d_copy(
         });
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;
-        std::cout << "Time taken for im2COL: " << elapsed.count() << " s" << std::endl;
+        std::cout << "Time taken for window to columns: " << elapsed.count() << std::endl;
   }
   
     // printing unfolded data
