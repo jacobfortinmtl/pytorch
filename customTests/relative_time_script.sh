@@ -8,9 +8,11 @@ for size in "${sizes[@]}"; do
     SIZE=$size python relative_increase_speed.py >> ../../plots/relative_increase.txt
   done
 done
+> ../../plots/relative_increase_default.txt
 for size in "${sizes[@]}"; do
   for i in {1..10}; do
-    SIZE=$size DEFAULT=1 python relative_increase_speed.py >> ../../plots/relative_increase_windows.txt
+    SIZE=$size DEFAULT=1 python relative_increase_speed.py >> ../../plots/relative_increase_default.txt
   done
 done
 python relative_increase_speed_plotting.py
+DEFAULT=1 python relative_increase_speed_plotting.py

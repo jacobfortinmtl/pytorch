@@ -10,11 +10,6 @@ import pickle
 import sys
 import os
 
-# open file for writing
-
-# Open file for writing
-file_path = '../../plots/relative_increase.txt'
-
 choice = int(os.getenv('DEFAULT', '0'))
 
 if choice == 0:
@@ -65,3 +60,5 @@ elif choice == 1:
     end_time = time.time()
     elapsed_time = end_time - start_time
     print("Time taken for whole default", elapsed_time)
+
+
