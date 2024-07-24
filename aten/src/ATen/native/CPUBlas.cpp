@@ -234,6 +234,7 @@ void gemm(
     // Get environment variable to choose whether we call preprocessing or not
     char* env_var = std::getenv("DEFAULT");
     if (env_var != NULL && std::string(env_var) == "1") {
+      auto start = std::chrono::high_resolution_clock::now();
       sgemm_(
         &transa_, &transb_,
         &m_, &n_, &k_,
@@ -242,7 +243,11 @@ void gemm(
         b, &ldb_,
         &beta_,
         c, &ldc_);
+      auto end = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> elapsed = end - start;
+      std::cout << "Time taken to perform default sgemm_: " << elapsed.count() << "s" << std::endl;
     }else{
+      
       preprocessing(&transa_, &transb_, &m_, &n_, &k_, &alpha_, a, &lda_, b, &ldb_, &beta_, c, &ldc_);
     }
     #endif
