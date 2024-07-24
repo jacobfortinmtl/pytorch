@@ -1370,6 +1370,7 @@ static at::Tensor _convolution_nogroup_backend(
 #else
       TORCH_INTERNAL_ASSERT(false, "NnpackSpatial backend was selected in PyTorch compiled without nnpack support");
 #endif
+    case ConvBackend::Mkldnn:
     case ConvBackend::Slow2d:
       // std::cout << "HELLO FROM final function slow2d?" << std::endl;
       return at::thnn_conv2d(input, weight, kernel_size, bias, params.stride, params.padding);
@@ -1657,21 +1658,21 @@ at::Tensor _convolution(
           input.contiguous(backend_memory_format), weight, bias, params.padding, params.output_padding,
           params.stride, params.dilation, params.groups, params.benchmark, params.deterministic);
       break;
-    case ConvBackend::Mkldnn:
-#if AT_MKLDNN_ENABLED()
-      check_input_same_type_as_parameters(input, weight, bias, backend);
-      if (!input.is_mkldnn()) {
-        // need to ensure contiguous for non-mkldnn tensors
-        input = input.contiguous(backend_memory_format);
-        weight = weight.contiguous(backend_memory_format);
-        bias = bias.defined() ? bias.contiguous() : bias;
-      }
-      output = at::mkldnn_convolution(
-          input, weight, bias, params.padding, params.stride, params.dilation, params.groups);
-#else
-      TORCH_INTERNAL_ASSERT(false, "Mkldnn backend was selected in PyTorch compiled without mkldnn support");
-#endif
-      break;
+    // case ConvBackend::Mkldnn:
+// #if AT_MKLDNN_ENABLED()
+//       check_input_same_type_as_parameters(input, weight, bias, backend);
+//       if (!input.is_mkldnn()) {
+//         // need to ensure contiguous for non-mkldnn tensors
+//         input = input.contiguous(backend_memory_format);
+//         weight = weight.contiguous(backend_memory_format);
+//         bias = bias.defined() ? bias.contiguous() : bias;
+//       }
+//       output = at::mkldnn_convolution(
+//           input, weight, bias, params.padding, params.stride, params.dilation, params.groups);
+// #else
+//       TORCH_INTERNAL_ASSERT(false, "Mkldnn backend was selected in PyTorch compiled without mkldnn support");
+// #endif
+//       break;
     case ConvBackend::MkldnnTranspose:
 #if AT_MKLDNN_ENABLED()
       check_input_same_type_as_parameters(input, weight, bias, backend);
@@ -1715,6 +1716,7 @@ at::Tensor _convolution(
     // Handle backends that don't natively support groups > 1.
     case ConvBackend::NnpackSpatial:
     case ConvBackend::Slow2d:
+    case ConvBackend::Mkldnn: // FORCING IT TO USE OUR CUSTOM IMPLEMENTATION
     case ConvBackend::SlowDilated2d:
     case ConvBackend::SlowDilated3d:
     case ConvBackend::SlowTranspose2d:
