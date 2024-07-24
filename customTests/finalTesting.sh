@@ -2,10 +2,10 @@ executable="finaltest.py"
 num_procs=$(nproc)
 
 # Loop 10 times calling test.py
-
+# Conversion is to specify im2col, but still use our custom implementation for nans. If we only set default=1, it will use the torch default all the way.
 > ../../plots/FINAL_TIMING.txt
 for i in {1..10}; do
-    CONVERSION=1 python3 $executable >> ../../plots/FINAL_TIMING.txt
+    python3 $executable >> ../../plots/FINAL_TIMING.txt
 done
 
 > ../../plots/FINAL_TIMING_DEFAULT.txt
