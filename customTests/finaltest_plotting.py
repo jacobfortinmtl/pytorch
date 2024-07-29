@@ -1,9 +1,6 @@
 import re
 import os
 
-# Get environment variable for default
-default = int(os.environ.get('DEFAULT', 0))
-
 def parse_and_average_timing(file_path):
     total_times = {
         "window_to_columns": 0.0,
@@ -11,7 +8,7 @@ def parse_and_average_timing(file_path):
         "copy_windows": 0.0,
         "perform_sgemm": 0.0,
         "re_insert_NaNs": 0.0,
-        "convolution": 0.0
+        "im2row": 0.0
     }
     counts = {
         "window_to_columns": 0,
@@ -19,7 +16,7 @@ def parse_and_average_timing(file_path):
         "copy_windows": 0,
         "perform_sgemm": 0,
         "re_insert_NaNs": 0,
-        "convolution": 0
+        "im2row": 0
     }
     # Open and read through the file
     with open(file_path, 'r') as file:
@@ -47,6 +44,9 @@ def parse_and_average_timing(file_path):
                 elif "Time taken to re-insert NaNs" in key:
                     total_times["re_insert_NaNs"] += value
                     counts["re_insert_NaNs"] += 1
+                elif "Time taken for im2ROW" in key:
+                    total_times["im2row"] += value
+                    counts["im2row"] += 1
 
     # Calculate and print averages
     for key in total_times:
@@ -56,10 +56,12 @@ def parse_and_average_timing(file_path):
 
 def parse_and_average_timing_default(file_path):
     total_times = {
-        "perform_sgemm": 0.0
+        "perform_sgemm": 0.0,
+        "perform_im2col": 0.0
     }
     counts = {
-        "perform_sgemm": 0
+        "perform_sgemm": 0,
+        "perform_im2col": 0
     }
     # Open and read through the file
     with open(file_path, 'r') as file:
@@ -75,13 +77,18 @@ def parse_and_average_timing_default(file_path):
                 if "Time taken to perform default sgemm_" in key:
                     total_times["perform_sgemm"] += value
                     counts["perform_sgemm"] += 1
+                elif "Time taken for window to columns" in key:
+                    total_times["perform_im2col"] += value
+                    counts["perform_im2col"] += 1
 
     # Calculate and print averages
     for key in total_times:
         if counts[key] > 0:
             print(f"Average {key}: {total_times[key] / counts[key]}")
     print()
-# Example usage
+
+# Get environment variable for default
+default = int(os.environ.get('DEFAULT', 0))
 if default != 1:
     file_path = '../../plots/FINAL_TIMING.txt'
     parse_and_average_timing(file_path)

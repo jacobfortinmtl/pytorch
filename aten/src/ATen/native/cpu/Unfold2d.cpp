@@ -258,8 +258,8 @@ static void unfolded2d_copy(
     if (env_var_conv != NULL && std::string(env_var_conv) == "1") {
       flag = 0;
     }
-    if (flag == 1){
-      auto start = std::chrono::high_resolution_clock::now();
+    if (flag == 0){
+      // auto start = std::chrono::high_resolution_clock::now();
       // std::cout << "Using row major order for im2col" << std::endl;
       std::cout << std::endl;
       const scalar_t* src = input_data;
@@ -315,12 +315,12 @@ static void unfolded2d_copy(
           }
         }
       }
-      auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-        std::cout << "Time taken for im2ROW: " << elapsed.count() << std::endl;
+      // auto end = std::chrono::high_resolution_clock::now();
+        // std::chrono::duration<double> elapsed = end - start;
+        // std::cout << "Time taken for im2ROW: " << elapsed.count() << std::endl;
     }
     else{
-        auto start = std::chrono::high_resolution_clock::now();
+        // auto start = std::chrono::high_resolution_clock::now();
         at::parallel_for(
         0, (int64_t)n_input_plane * kH * kW, 0, [&](int64_t start, int64_t end) {
           for (const auto k : c10::irange(start, end)) {
@@ -421,9 +421,9 @@ static void unfolded2d_copy(
             }
           }
         });
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = end - start;
-        std::cout << "Time taken for window to columns: " << elapsed.count() << std::endl;
+        // auto end = std::chrono::high_resolution_clock::now();
+        // std::chrono::duration<double> elapsed = end - start;
+        // std::cout << "Time taken for window to columns: " << elapsed.count() << std::endl;
   }
   
     // printing unfolded data
