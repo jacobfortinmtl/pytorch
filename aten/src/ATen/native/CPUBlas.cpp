@@ -358,6 +358,8 @@ void preprocessing(
     // Need to send pointers since we're using the passed arguments
 
     // auto start3 = std::chrono::high_resolution_clock::now();
+
+    // Not sure why this is failing in dockerfile
     sgemm_(
         transa, transb,
         m, n, k,
