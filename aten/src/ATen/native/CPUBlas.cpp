@@ -287,7 +287,7 @@ void preprocessing(
     float* beta, float* c, int* ldc) 
 {
     // Get threshold from environment variable
-    int nan_threshold = 2; // defaults to 2
+    float nan_threshold = 0.50; // defaults to 2
     char* env_threshold = std::getenv("THRESHOLD");
     if (env_threshold != NULL){
       nan_threshold = std::stoi(env_threshold);
@@ -311,7 +311,7 @@ void preprocessing(
         for (int j = 0; j < *k; ++j) { // k is num elements in the window
             if (std::isnan(a[j * (*lda) + i])) {
                 nan_count++;
-                if (nan_count > nan_threshold) {
+                if (nan_count > (nan_threshold * static_cast<float>(*k))) {
                     row_to_remove[i] = true;
                     rows_removed++;
                     break;
@@ -349,7 +349,6 @@ void preprocessing(
     // std::chrono::duration<double> elapsed2 = end2 - start2;
     // std::cout << "Time taken to copy windows: " << elapsed2.count() << "s" << std::endl;
     // Setting the pointer of a to this new memory location and updating sizes
-    int old_m = *m;
     a = new_a;
     *m = new_m;
     *lda = new_m;
