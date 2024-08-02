@@ -286,17 +286,39 @@ void preprocessing(
     float* alpha, const float* a, int* lda, const float* b, int* ldb, 
     float* beta, float* c, int* ldc) 
 {
+    // Printing the passed variables
+    // std::cout << "Printing the passed variables: " << std::endl;
+    // std::cout << "transa: " << *transa << std::endl;
+    // std::cout << "transb: " << *transb << std::endl;
+    // std::cout << "m: " << *m << std::endl;
+    // std::cout << "n: " << *n << std::endl;
+    // std::cout << "k: " << *k << std::endl;
+    // std::cout << "alpha: " << *alpha << std::endl;
+    // std::cout << "lda: " << *lda << std::endl;
+    // std::cout << "ldb: " << *ldb << std::endl;
+    // std::cout << "beta: " << *beta << std::endl;
+    // std::cout << "ldc: " << *ldc << std::endl;
+
+
     // Get threshold from environment variable
     float nan_threshold = 0.50; // defaults to 2
     char* env_threshold = std::getenv("THRESHOLD");
     if (env_threshold != NULL){
       nan_threshold = std::stoi(env_threshold);
     }
-    bool* row_to_remove = new bool[*m];
-    int rows_removed = 0;
+    bool* col_to_remove = new bool[*m * *n];
+    int cols_removed = 0;
     int nan_count = 0;
     int new_m = *m;
+    // Printing m, n, k
+    
 
+    // Printing the memory of A
+    // std::cout << "Memory of A: " << std::endl;
+    // for (int i = 0; i < *m * *k * *n; ++i) {
+    //   std::cout << a[i] << " ";
+    // }
+    // std::cout << std::endl;
     // Identify rows to remove
     /* Parallelizing the outer for loop using OpenMP
     Private vs reduction, both create copies but those in private are not aggragated at the end, but rather discarded. 
@@ -304,20 +326,30 @@ void preprocessing(
     */
     // Adding time counters
     // auto start = std::chrono::high_resolution_clock::now();
-    #pragma omp parallel for reduction(+:rows_removed) private (nan_count)
-    for (int i = 0; i < *m; ++i) {
-        nan_count = 0;
-        row_to_remove[i] = false;
-        for (int j = 0; j < *k; ++j) { // k is num elements in the window
-            if (std::isnan(a[j * (*lda) + i])) {
+    int offset = 0;
+    int offset_col = 0;
+    for (int cur_n = 0; cur_n < *n; ++cur_n) {
+      offset = cur_n * (*lda) * (*k);
+      offset_col = cur_n * (*lda);
+      #pragma omp parallel for reduction(+:cols_removed) private (nan_count)
+      for (int i = 0; i < *m; ++i) {
+          // std::cout << "i + offset: " << i + offset << ", Elements: ";
+          nan_count = 0;
+          col_to_remove[i + offset_col] = false;
+          // std::cout << "Checking window: " << i << ", Elements: ";
+          for (int j = 0; j < *k; ++j) { // k is num elements in the window
+            // std::cout << a[j * (*lda) + i + offset] << " ";
+            if (std::isnan(a[j * (*lda) + i + offset])) {
                 nan_count++;
                 if (nan_count > (nan_threshold * static_cast<float>(*k))) {
-                    row_to_remove[i] = true;
-                    rows_removed++;
+                    col_to_remove[i + offset_col] = true;
+                    cols_removed++;
                     break;
                 }
             }
-        }
+          }
+          // std::cout << std::endl;
+      }
     }
     // auto end = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double> elapsed = end - start;
@@ -325,19 +357,25 @@ void preprocessing(
 
     // auto start2 = std::chrono::high_resolution_clock::now();
     // Determining the new index for each column
-    int* new_index = new int[*m];
-    int new_row_tracker = 0;
-    for (int i = 0; i < *m; ++i) {
-      new_index[i] = !row_to_remove[i] ? new_row_tracker++ : -1;
+    // std::cout << "Columns Removed: " << std::endl;
+    // for (int i = 0; i < *m * *n; ++i) {
+    //   std::cout << col_to_remove[i] << " ";
+    // }
+    // std::cout << std::endl;
+    int* new_index = new int[*m * *n];
+    int new_col_tracker = 0;
+    for (int i = 0; i < *m * *n; ++i) {
+      new_index[i] = !col_to_remove[i] ? new_col_tracker++ : -1;
     }
-
-    new_m = *m - rows_removed;
+   
+    // TODO until here batches work
+    new_m = *m - (cols_removed/ (*n));
     // Allocate memory for the new matrix
-    float* new_a = new float[new_m * (*k)];
+    float* new_a = new float[new_m * (*k)* (*n)];
 
     // Write the new matrix in column-major order
     #pragma omp parallel for
-    for (int i = 0; i < *m; ++i) {
+    for (int i = 0; i < *m * *n; ++i) {
       if (new_index[i] != -1) {
         for (int j = 0; j < *k; ++j) {
           // checking if we're inserting NaNs
@@ -359,6 +397,12 @@ void preprocessing(
     // auto start3 = std::chrono::high_resolution_clock::now();
 
     // Not sure why this is failing in dockerfile
+    // Checking matrix a being sent
+    // std::cout << "Memory of A being passed: " << std::endl;
+    // for (int i = 0; i < *m * *k * *n; ++i) {
+    //   std::cout << a[i] << " ";
+    // }
+    // std::cout << std::endl;
     sgemm_(
         transa, transb,
         m, n, k,
@@ -373,15 +417,26 @@ void preprocessing(
     /*
     Method 1: Right-to left in-place NaN insertions.
     To do so, we will keep two pointers in Matrix C and iterate from right to left. The first pointer will point to index c + *lda * *n - 1. 
-    The second will point to C + *ldc * *n - 1. Recall, lda < ldc since we adjust lda earlier. If the value in the row is NaN, we will insert NaNs at the second pointer. Else, we will
+    The second will point to C + *ldc * *n - 1. Recall, lda < ldc since we adjust lda earlier. 
+    If the value in the row is NaN, we will insert NaNs at the second pointer. Else, we will
     insert at the second pointer, the value pointed by the first pointer. 
     Best Case: 1 copy, O(n) time complexity
     Worst Case: 1 full copy, O(n) time complexity
     */
+    float* c_ptr = nullptr;
+    float* c_ptrLDA = nullptr;
+
     // Pointer 1: End of matrix C
-    float* c_ptr = c + *ldc * *n - 1;
+    c_ptr = c + ((*ldc) * *n) - 1;
     // Pointer 2: At index *lda - 1, which is the end of 
-    float* c_ptrLDA = c + *lda* *n - 1;
+    c_ptrLDA = c + ((*lda) * *n) - 1;
+
+    // What memory c looks like before re-insertion
+    // std::cout << "Memory of C before re-insertion: " << std::endl;
+    // for (int i = 0; i < (*ldc) * (*n); ++i) {
+    //     std::cout << c[i] << " ";
+    // }
+    // std::cout << std::endl;
 
     // Algorithm
     // check if envrinoment variable specifies re-insertion
@@ -392,30 +447,29 @@ void preprocessing(
     }
     // auto start4 = std::chrono::high_resolution_clock::now();
     if (flag == 1){
-      for (int i = *ldc - 1; i >= 0; --i){
-        if (row_to_remove[i]){
-            for (int j = 0; j < *n; ++j){
-                *c_ptr = std::numeric_limits<float>::quiet_NaN();
-                c_ptr--;
-            }
+      for (int i = (*ldc)* *n - 1; i >= 0; --i){
+        if (col_to_remove[i]){
+          *c_ptr = std::numeric_limits<float>::quiet_NaN();
+          // std::cout << "Inserting NaN at index: " << i << std::endl;
+          c_ptr--;
         } else {
-            for (int j = 0; j < *n; ++j){
-                *c_ptr = *c_ptrLDA;
-                c_ptr--;
-                c_ptrLDA--;
-            }
+          // std::cout << "Inserting value: "<< *c_ptrLDA << " at index: " << i << std::endl;
+          *c_ptr = *c_ptrLDA;
+          c_ptr--;
+          c_ptrLDA--;
         }
       }
     }
+    
     // auto end4 = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double> elapsed4 = end4 - start4;
     // std::cout << "Time taken to re-insert NaNs: " << elapsed4.count() << "s" << std::endl;
     // std::cout << std::endl;
     // std::cout << "Number of initial windows: " << old_m << std::endl;
-    // std::cout << "Convolutions skipped removed: " << rows_removed<< std::endl;
+    // std::cout << "Convolutions skipped removed: " << cols_removed<< std::endl;
     delete[] new_a;
     delete[] new_index;
-    delete[] row_to_remove;
+    delete[] col_to_remove;
 }
 
 
