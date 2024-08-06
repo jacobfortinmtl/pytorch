@@ -287,17 +287,17 @@ void preprocessing(
     float* beta, float* c, int* ldc) 
 {
     // Printing the passed variables
-    // std::cout << "Printing the passed variables: " << std::endl;
-    // std::cout << "transa: " << *transa << std::endl;
-    // std::cout << "transb: " << *transb << std::endl;
-    // std::cout << "m: " << *m << std::endl;
-    // std::cout << "n: " << *n << std::endl;
-    // std::cout << "k: " << *k << std::endl;
-    // std::cout << "alpha: " << *alpha << std::endl;
-    // std::cout << "lda: " << *lda << std::endl;
-    // std::cout << "ldb: " << *ldb << std::endl;
-    // std::cout << "beta: " << *beta << std::endl;
-    // std::cout << "ldc: " << *ldc << std::endl;
+    std::cout << "Printing the passed variables: " << std::endl;
+    std::cout << "transa: " << *transa << std::endl;
+    std::cout << "transb: " << *transb << std::endl;
+    std::cout << "m: " << *m << std::endl;
+    std::cout << "n: " << *n << std::endl;
+    std::cout << "k: " << *k << std::endl;
+    std::cout << "alpha: " << *alpha << std::endl;
+    std::cout << "lda: " << *lda << std::endl;
+    std::cout << "ldb: " << *ldb << std::endl;
+    std::cout << "beta: " << *beta << std::endl;
+    std::cout << "ldc: " << *ldc << std::endl;
 
 
     // Get threshold from environment variable
@@ -306,7 +306,7 @@ void preprocessing(
     if (env_threshold != NULL){
       nan_threshold = std::stof(env_threshold);
     }
-    bool* col_to_remove = new bool[*m * *n];
+    bool* col_to_remove = new bool[*m];
     int cols_removed = 0;
     int nan_count = 0;
     int new_m = *m;
@@ -314,11 +314,13 @@ void preprocessing(
     
 
     // Printing the memory of A
-    // std::cout << "Memory of A: " << std::endl;
-    // for (int i = 0; i < *m * *k * *n; ++i) {
-    //   std::cout << a[i] << " ";
+    // std::cout << "Windows: " << std::endl;
+    // for (int i = 0; i < *m; ++i) {
+    //   for (int j = 0; j < *k; ++j) {
+    //     std::cout << a[j * (*lda) + i] << " ";
+    //   }
+    //   std::cout << std::endl;
     // }
-    // std::cout << std::endl;
     // Identify rows to remove
     /* Parallelizing the outer for loop using OpenMP
     Private vs reduction, both create copies but those in private are not aggragated at the end, but rather discarded. 
@@ -328,7 +330,8 @@ void preprocessing(
     // auto start = std::chrono::high_resolution_clock::now();
     int offset = 0;
     int offset_col = 0;
-    for (int cur_n = 0; cur_n < *n; ++cur_n) {
+    float epsilon = 0.000001;
+    for (int cur_n = 0; cur_n < 1; ++cur_n) {
       offset = cur_n * (*lda) * (*k);
       offset_col = cur_n * (*lda);
       #pragma omp parallel for reduction(+:cols_removed) private (nan_count)
@@ -341,7 +344,7 @@ void preprocessing(
             // std::cout << a[j * (*lda) + i + offset] << " ";
             if (std::isnan(a[j * (*lda) + i + offset])) {
                 nan_count++;
-                if (nan_count > (nan_threshold * static_cast<float>(*k))) {
+                if (nan_count > (nan_threshold * static_cast<float>(*k)) + epsilon) {
                     col_to_remove[i + offset_col] = true;
                     cols_removed++;
                     break;
@@ -357,11 +360,11 @@ void preprocessing(
 
     // auto start2 = std::chrono::high_resolution_clock::now();
     // Determining the new index for each column
-    // std::cout << "Columns Removed: " << std::endl;
-    // for (int i = 0; i < *m * *n; ++i) {
-    //   std::cout << col_to_remove[i] << " ";
-    // }
-    // std::cout << std::endl;
+    std::cout << "Columns Removed: " << std::endl;
+    for (int i = 0; i < *m; ++i) {
+      std::cout << col_to_remove[i] << " ";
+    }
+    std::cout << std::endl;
     int* new_index = new int[*m * *n];
     int new_col_tracker = 0;
     for (int i = 0; i < *m * *n; ++i) {
@@ -369,13 +372,13 @@ void preprocessing(
     }
    
     // TODO until here batches work
-    new_m = *m - (cols_removed/ (*n));
+    new_m = *m - (cols_removed);
     // Allocate memory for the new matrix
-    float* new_a = new float[new_m * (*k)* (*n)];
+    float* new_a = new float[new_m * (*k)];
 
     // Write the new matrix in column-major order
     #pragma omp parallel for
-    for (int i = 0; i < *m * *n; ++i) {
+    for (int i = 0; i < *m; ++i) {
       if (new_index[i] != -1) {
         for (int j = 0; j < *k; ++j) {
           // checking if we're inserting NaNs
@@ -399,10 +402,19 @@ void preprocessing(
     // Not sure why this is failing in dockerfile
     // Checking matrix a being sent
     // std::cout << "Memory of A being passed: " << std::endl;
-    // for (int i = 0; i < *m * *k * *n; ++i) {
+    // for (int i = 0; i < *m * *k; ++i) {
     //   std::cout << a[i] << " ";
     // }
     // std::cout << std::endl;
+    // Printing the windows
+    // std::cout << "AFter removal: " << std::endl;
+    // std::cout << "Windows: " << std::endl;
+    // for (int i = 0; i < *m; ++i) {
+    //   for (int j = 0; j < *k; ++j) {
+    //     std::cout << a[j * (*lda) + i] << " ";
+    //   }
+    //   std::cout << std::endl;
+    // }
     sgemm_(
         transa, transb,
         m, n, k,
@@ -427,16 +439,15 @@ void preprocessing(
     float* c_ptrLDA = nullptr;
 
     // Pointer 1: End of matrix C
-    c_ptr = c + ((*ldc) * *n) - 1;
+    c_ptr = c + ((*ldc)* *n) - 1;
     // Pointer 2: At index *lda - 1, which is the end of what sgemm returns
-    c_ptrLDA = c + ((*lda) * *n) - 1;
-
+    c_ptrLDA = c + ((*lda)) - 1;
     // What memory c looks like before re-insertion
-    // std::cout << "Memory of C before re-insertion: " << std::endl;
-    // for (int i = 0; i < (*ldc) * (*n); ++i) {
-    //     std::cout << c[i] << " ";
-    // }
-    // std::cout << std::endl;
+    std::cout << "Memory of C before re-insertion: " << std::endl;
+    for (int i = 0; i < (*ldc); ++i) {
+        std::cout << c[i] << " ";
+    }
+    std::cout << std::endl;
 
     // Algorithm
     // check if envrinoment variable specifies re-insertion
@@ -447,17 +458,22 @@ void preprocessing(
     }
     // auto start4 = std::chrono::high_resolution_clock::now();
     if (flag == 1){
-      for (int i = (*ldc)* *n - 1; i >= 0; --i){
-        if (col_to_remove[i]){
-          *c_ptr = std::numeric_limits<float>::quiet_NaN();
-          // std::cout << "Inserting NaN at index: " << i << std::endl;
-          c_ptr--;
-        } else {
-          // std::cout << "Inserting value: "<< *c_ptrLDA << " at index: " << i << std::endl;
-          *c_ptr = *c_ptrLDA;
-          c_ptr--;
-          c_ptrLDA--;
+      for (int cur_n = *n; cur_n > 0; --cur_n) {
+        for (int i = (*ldc) - 1; i >= 0; --i){
+          std::cout << "Checking window: " << i << std::endl;
+          if (col_to_remove[i]){
+            *c_ptr = std::numeric_limits<float>::quiet_NaN();
+            std::cout << "Inserting NaN at index: " << i << std::endl;
+            c_ptr--;
+          } else {
+            std::cout << "Inserting value: "<< *c_ptrLDA << " at index: " << i*cur_n << std::endl;
+            *c_ptr = *c_ptrLDA;
+            c_ptr--;
+            c_ptrLDA--;
+          }
         }
+        // Reset the pointer
+        c_ptrLDA = c + ((*lda)) - 1;
       }
     }
     

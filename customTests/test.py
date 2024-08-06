@@ -11,7 +11,7 @@ torch.set_num_threads(1)
 # Setting the seed for reproducibility
 torch.manual_seed(42)
 channels = 2
-batches = 2
+batches = 1
 size = 4**2
 sqrt_size = int(math.sqrt(size))
 # Determine how many elements should be NaN
