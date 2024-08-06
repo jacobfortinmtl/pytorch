@@ -304,7 +304,7 @@ void preprocessing(
     float nan_threshold = 0.50; // defaults to 2
     char* env_threshold = std::getenv("THRESHOLD");
     if (env_threshold != NULL){
-      nan_threshold = std::stoi(env_threshold);
+      nan_threshold = std::stof(env_threshold);
     }
     bool* col_to_remove = new bool[*m * *n];
     int cols_removed = 0;
@@ -428,7 +428,7 @@ void preprocessing(
 
     // Pointer 1: End of matrix C
     c_ptr = c + ((*ldc) * *n) - 1;
-    // Pointer 2: At index *lda - 1, which is the end of 
+    // Pointer 2: At index *lda - 1, which is the end of what sgemm returns
     c_ptrLDA = c + ((*lda) * *n) - 1;
 
     // What memory c looks like before re-insertion
