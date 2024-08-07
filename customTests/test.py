@@ -10,7 +10,7 @@ torch.set_num_threads(1)
 
 # Setting the seed for reproducibility
 torch.manual_seed(42)
-channels = 2
+channels = 1
 batches = 1
 size = 4**2
 sqrt_size = int(math.sqrt(size))
@@ -32,7 +32,7 @@ print("Input Tensor: ")
 print(input_tensor)
 
 # Create a random weights tensor of integers
-weight = torch.ones(1*batches, 1*channels, 2, 2).float()
+weight = torch.ones(1, 1*channels, 2, 2).float()
 
 # Apply the convolution operation
 print("Size: ", sqrt_size**2)

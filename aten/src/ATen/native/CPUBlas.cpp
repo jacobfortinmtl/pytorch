@@ -287,17 +287,17 @@ void preprocessing(
     float* beta, float* c, int* ldc) 
 {
     // Printing the passed variables
-    std::cout << "Printing the passed variables: " << std::endl;
-    std::cout << "transa: " << *transa << std::endl;
-    std::cout << "transb: " << *transb << std::endl;
-    std::cout << "m: " << *m << std::endl;
-    std::cout << "n: " << *n << std::endl;
-    std::cout << "k: " << *k << std::endl;
-    std::cout << "alpha: " << *alpha << std::endl;
-    std::cout << "lda: " << *lda << std::endl;
-    std::cout << "ldb: " << *ldb << std::endl;
-    std::cout << "beta: " << *beta << std::endl;
-    std::cout << "ldc: " << *ldc << std::endl;
+    // std::cout << "Printing the passed variables: " << std::endl;
+    // std::cout << "transa: " << *transa << std::endl;
+    // std::cout << "transb: " << *transb << std::endl;
+    // std::cout << "m: " << *m << std::endl;
+    // std::cout << "n: " << *n << std::endl;
+    // std::cout << "k: " << *k << std::endl;
+    // std::cout << "alpha: " << *alpha << std::endl;
+    // std::cout << "lda: " << *lda << std::endl;
+    // std::cout << "ldb: " << *ldb << std::endl;
+    // std::cout << "beta: " << *beta << std::endl;
+    // std::cout << "ldc: " << *ldc << std::endl;
 
 
     // Get threshold from environment variable
@@ -360,11 +360,11 @@ void preprocessing(
 
     // auto start2 = std::chrono::high_resolution_clock::now();
     // Determining the new index for each column
-    std::cout << "Columns Removed: " << std::endl;
-    for (int i = 0; i < *m; ++i) {
-      std::cout << col_to_remove[i] << " ";
-    }
-    std::cout << std::endl;
+    // std::cout << "Columns Removed: " << std::endl;
+    // for (int i = 0; i < *m; ++i) {
+    //   std::cout << col_to_remove[i] << " ";
+    // }
+    // std::cout << std::endl;
     int* new_index = new int[*m * *n];
     int new_col_tracker = 0;
     for (int i = 0; i < *m * *n; ++i) {
@@ -407,14 +407,14 @@ void preprocessing(
     // }
     // std::cout << std::endl;
     // Printing the windows
-    // std::cout << "AFter removal: " << std::endl;
-    // std::cout << "Windows: " << std::endl;
-    // for (int i = 0; i < *m; ++i) {
-    //   for (int j = 0; j < *k; ++j) {
-    //     std::cout << a[j * (*lda) + i] << " ";
-    //   }
-    //   std::cout << std::endl;
-    // }
+    std::cout << "AFter removal: " << std::endl;
+    std::cout << "Windows: " << std::endl;
+    for (int i = 0; i < *m; ++i) {
+      for (int j = 0; j < *k; ++j) {
+        std::cout << a[j * (*lda) + i] << " ";
+      }
+      std::cout << std::endl;
+    }
     sgemm_(
         transa, transb,
         m, n, k,
@@ -442,7 +442,7 @@ void preprocessing(
     c_ptr = c + ((*ldc)* *n) - 1;
     // Pointer 2: At index *lda - 1, which is the end of what sgemm returns
     c_ptrLDA = c + ((*lda)) - 1;
-    // What memory c looks like before re-insertion
+    What memory c looks like before re-insertion
     std::cout << "Memory of C before re-insertion: " << std::endl;
     for (int i = 0; i < (*ldc); ++i) {
         std::cout << c[i] << " ";
@@ -460,13 +460,13 @@ void preprocessing(
     if (flag == 1){
       for (int cur_n = *n; cur_n > 0; --cur_n) {
         for (int i = (*ldc) - 1; i >= 0; --i){
-          std::cout << "Checking window: " << i << std::endl;
+          // std::cout << "Checking window: " << i << std::endl;
           if (col_to_remove[i]){
             *c_ptr = std::numeric_limits<float>::quiet_NaN();
-            std::cout << "Inserting NaN at index: " << i << std::endl;
+            // std::cout << "Inserting NaN at index: " << i << std::endl;
             c_ptr--;
           } else {
-            std::cout << "Inserting value: "<< *c_ptrLDA << " at index: " << i*cur_n << std::endl;
+            // std::cout << "Inserting value: "<< *c_ptrLDA << " at index: " << i*cur_n << std::endl;
             *c_ptr = *c_ptrLDA;
             c_ptr--;
             c_ptrLDA--;
