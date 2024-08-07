@@ -32,7 +32,7 @@ print("Input Tensor: ")
 print(input_tensor)
 
 # Create a random weights tensor of integers
-weight = torch.ones(1, 1*channels, 2, 2).float()
+weight = torch.ones(1*batches, 1*channels, 2, 2).float()
 
 # Apply the convolution operation
 print("Size: ", sqrt_size**2)

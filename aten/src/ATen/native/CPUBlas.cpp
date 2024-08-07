@@ -328,30 +328,23 @@ void preprocessing(
     */
     // Adding time counters
     // auto start = std::chrono::high_resolution_clock::now();
-    int offset = 0;
-    int offset_col = 0;
-    float epsilon = 0.000001;
-    for (int cur_n = 0; cur_n < 1; ++cur_n) {
-      offset = cur_n * (*lda) * (*k);
-      offset_col = cur_n * (*lda);
-      #pragma omp parallel for reduction(+:cols_removed) private (nan_count)
-      for (int i = 0; i < *m; ++i) {
-          // std::cout << "i + offset: " << i + offset << ", Elements: ";
-          nan_count = 0;
-          col_to_remove[i + offset_col] = false;
-          // std::cout << "Checking window: " << i << ", Elements: ";
-          for (int j = 0; j < *k; ++j) { // k is num elements in the window
-            // std::cout << a[j * (*lda) + i + offset] << " ";
-            if (std::isnan(a[j * (*lda) + i + offset])) {
-                nan_count++;
-                if (nan_count > (nan_threshold * static_cast<float>(*k)) + epsilon) {
-                    col_to_remove[i + offset_col] = true;
-                    cols_removed++;
-                    break;
-                }
+
+    #pragma omp parallel for reduction(+:cols_removed) private (nan_count)
+    for (int i = 0; i < *m; ++i) {
+      // std::cout << "i + offset: " << i + offset << ", Elements: ";
+      nan_count = 0;
+      col_to_remove[i] = false;
+      // std::cout << "Checking window: " << i << ", Elements: ";
+      for (int j = 0; j < *k; ++j) { // k is num elements in the window
+        // std::cout << a[j * (*lda) + i] << " ";
+        if (std::isnan(a[j * (*lda) + i])) {
+            nan_count++;
+            if (nan_count > (nan_threshold * static_cast<float>(*k))) {
+                col_to_remove[i] = true;
+                cols_removed++;
+                break;
             }
-          }
-          // std::cout << std::endl;
+        }
       }
     }
     // auto end = std::chrono::high_resolution_clock::now();
@@ -407,14 +400,14 @@ void preprocessing(
     // }
     // std::cout << std::endl;
     // Printing the windows
-    std::cout << "AFter removal: " << std::endl;
-    std::cout << "Windows: " << std::endl;
-    for (int i = 0; i < *m; ++i) {
-      for (int j = 0; j < *k; ++j) {
-        std::cout << a[j * (*lda) + i] << " ";
-      }
-      std::cout << std::endl;
-    }
+    // std::cout << "AFter removal: " << std::endl;
+    // std::cout << "Windows: " << std::endl;
+    // for (int i = 0; i < *m* *n; ++i) {
+    //   for (int j = 0; j < *k; ++j) {
+    //     std::cout << a[j * (*lda) + i] << " ";
+    //   }
+    //   std::cout << std::endl;
+    // }
     sgemm_(
         transa, transb,
         m, n, k,
@@ -442,12 +435,12 @@ void preprocessing(
     c_ptr = c + ((*ldc)* *n) - 1;
     // Pointer 2: At index *lda - 1, which is the end of what sgemm returns
     c_ptrLDA = c + ((*lda)) - 1;
-    What memory c looks like before re-insertion
-    std::cout << "Memory of C before re-insertion: " << std::endl;
-    for (int i = 0; i < (*ldc); ++i) {
-        std::cout << c[i] << " ";
-    }
-    std::cout << std::endl;
+    // What memory c looks like before re-insertion
+    // std::cout << "Memory of C before re-insertion: " << std::endl;
+    // for (int i = 0; i < (*ldc)* *n; ++i) {
+    //     std::cout << c[i] << " ";
+    // }
+    // std::cout << std::endl;
 
     // Algorithm
     // check if envrinoment variable specifies re-insertion
