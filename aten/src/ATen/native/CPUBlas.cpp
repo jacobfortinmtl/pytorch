@@ -314,13 +314,11 @@ void preprocessing(
     
 
     // Printing the memory of A
-    // std::cout << "Windows: " << std::endl;
-    // for (int i = 0; i < *m; ++i) {
-    //   for (int j = 0; j < *k; ++j) {
-    //     std::cout << a[j * (*lda) + i] << " ";
-    //   }
-    //   std::cout << std::endl;
+    // std::cout << "Memory of A: " << std::endl;
+    // for (int i = 0; i < *m * *k; ++i) {
+    //   std::cout << a[i] << " ";
     // }
+    // std::cout << std::endl;
     // Identify rows to remove
     /* Parallelizing the outer for loop using OpenMP
     Private vs reduction, both create copies but those in private are not aggragated at the end, but rather discarded. 
@@ -328,24 +326,23 @@ void preprocessing(
     */
     // Adding time counters
     // auto start = std::chrono::high_resolution_clock::now();
-
     #pragma omp parallel for reduction(+:cols_removed) private (nan_count)
     for (int i = 0; i < *m; ++i) {
-      // std::cout << "i + offset: " << i + offset << ", Elements: ";
-      nan_count = 0;
-      col_to_remove[i] = false;
-      // std::cout << "Checking window: " << i << ", Elements: ";
-      for (int j = 0; j < *k; ++j) { // k is num elements in the window
-        // std::cout << a[j * (*lda) + i] << " ";
-        if (std::isnan(a[j * (*lda) + i])) {
-            nan_count++;
-            if (nan_count > (nan_threshold * static_cast<float>(*k))) {
-                col_to_remove[i] = true;
-                cols_removed++;
-                break;
-            }
+        nan_count = 0;
+        col_to_remove[i] = false;
+        // std::cout << "Checking window: " << i << ", Elements: ";
+        for (int j = 0; j < *k; ++j) { // k is num elements in the window
+          // std::cout << a[j * (*lda) + i] << " ";
+          if (std::isnan(a[j * (*lda) + i])) {
+              nan_count++;
+              if (nan_count > (nan_threshold * static_cast<float>(*k))) {
+                  col_to_remove[i] = true;
+                  cols_removed++;
+                  break;
+              }
+          }
         }
-      }
+        // std::cout << std::endl;
     }
     // auto end = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double> elapsed = end - start;
@@ -358,13 +355,12 @@ void preprocessing(
     //   std::cout << col_to_remove[i] << " ";
     // }
     // std::cout << std::endl;
-    int* new_index = new int[*m * *n];
+    int* new_index = new int[*m];
     int new_col_tracker = 0;
-    for (int i = 0; i < *m * *n; ++i) {
+    for (int i = 0; i < *m; ++i) {
       new_index[i] = !col_to_remove[i] ? new_col_tracker++ : -1;
     }
    
-    // TODO until here batches work
     new_m = *m - (cols_removed);
     // Allocate memory for the new matrix
     float* new_a = new float[new_m * (*k)];
@@ -383,6 +379,7 @@ void preprocessing(
     // std::chrono::duration<double> elapsed2 = end2 - start2;
     // std::cout << "Time taken to copy windows: " << elapsed2.count() << "s" << std::endl;
     // Setting the pointer of a to this new memory location and updating sizes
+    // std::cout << "New M: " << new_m << std::endl;
     a = new_a;
     *m = new_m;
     *lda = new_m;
@@ -399,23 +396,20 @@ void preprocessing(
     //   std::cout << a[i] << " ";
     // }
     // std::cout << std::endl;
-    // Printing the windows
-    // std::cout << "AFter removal: " << std::endl;
-    // std::cout << "Windows: " << std::endl;
-    // for (int i = 0; i < *m* *n; ++i) {
-    //   for (int j = 0; j < *k; ++j) {
-    //     std::cout << a[j * (*lda) + i] << " ";
-    //   }
-    //   std::cout << std::endl;
-    // }
-    sgemm_(
-        transa, transb,
-        m, n, k,
-        alpha,
-        a, lda,
-        b, ldb,
-        beta,
-        c, ldc);
+    int skipped = 0;
+    if (*m == 0 || *lda == 0){
+      skipped = 1;
+    }
+    if (skipped == 0){
+      sgemm_(
+          transa, transb,
+          m, n, k,
+          alpha,
+          a, lda,
+          b, ldb,
+          beta,
+          c, ldc);
+    }
     // auto end3 = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double> elapsed3 = end3 - start3;
     // std::cout << "Time taken to perform sgemm_: " << elapsed3.count() << "s" << std::endl;
@@ -431,13 +425,9 @@ void preprocessing(
     float* c_ptr = nullptr;
     float* c_ptrLDA = nullptr;
 
-    // Pointer 1: End of matrix C
-    c_ptr = c + ((*ldc)* *n) - 1;
-    // Pointer 2: At index *lda - 1, which is the end of what sgemm returns
-    c_ptrLDA = c + ((*lda)) - 1;
     // What memory c looks like before re-insertion
     // std::cout << "Memory of C before re-insertion: " << std::endl;
-    // for (int i = 0; i < (*ldc)* *n; ++i) {
+    // for (int i = 0; i < (*ldc) * (*n); ++i) {
     //     std::cout << c[i] << " ";
     // }
     // std::cout << std::endl;
@@ -450,25 +440,34 @@ void preprocessing(
       flag = std::stoi(env_reinsert); //if we pass 0 it won't run
     }
     // auto start4 = std::chrono::high_resolution_clock::now();
+    int offset = 0;
     if (flag == 1){
-      for (int cur_n = *n; cur_n > 0; --cur_n) {
+      #pragma omp parallel for private(offset, c_ptr, c_ptrLDA)
+      for (int cur_n = *n; cur_n > 0; --cur_n){
+        offset = (cur_n - 1) * (*ldc);
+        // std::cout << std::endl;
+        // std::cout << "c_ptr: " << ((*ldc) - 1 + offset) << std::endl;
+        // std::cout << "c_ptrLDA: " << (*lda - 1 + offset) << std::endl;
+        // std::cout << std::endl;
+        // Pointer 1: End of matrix C
+        c_ptr = c + ((*ldc) - 1 + offset);
+        // Pointer 2: At index *lda - 1, which is the end of what sgemm returns
+        c_ptrLDA = c + (*lda - 1 + offset);
         for (int i = (*ldc) - 1; i >= 0; --i){
-          // std::cout << "Checking window: " << i << std::endl;
-          if (col_to_remove[i]){
+          // std::cout << "Modulo checking: " << i % (*ldc) << std::endl;
+          if (col_to_remove[i%(*ldc)]){
             *c_ptr = std::numeric_limits<float>::quiet_NaN();
             // std::cout << "Inserting NaN at index: " << i << std::endl;
-            c_ptr--;
           } else {
-            // std::cout << "Inserting value: "<< *c_ptrLDA << " at index: " << i*cur_n << std::endl;
+            // std::cout << "Inserting value: "<< *c_ptrLDA << " at index: " << i << std::endl;
             *c_ptr = *c_ptrLDA;
-            c_ptr--;
             c_ptrLDA--;
           }
+          c_ptr--;
         }
-        // Reset the pointer
-        c_ptrLDA = c + ((*lda)) - 1;
       }
-    }
+
+      }
     
     // auto end4 = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double> elapsed4 = end4 - start4;
