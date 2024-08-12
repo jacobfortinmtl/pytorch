@@ -233,7 +233,7 @@ void gemm(
     // Custom pre-processing steps
     // Get environment variable to choose whether we call preprocessing or not
     char* env_var = std::getenv("DEFAULT");
-    if (env_var != NULL && std::string(env_var) == "1") {
+    if ((env_var != NULL && std::string(env_var) == "1") || transa_ == 'T') {
       sgemm_(
         &transa_, &transb_,
         &m_, &n_, &k_,
@@ -400,6 +400,7 @@ void preprocessing(
     if (*m == 0 || *lda == 0){
       skipped = 1;
     }
+    
     if (skipped == 0){
       sgemm_(
           transa, transb,
@@ -466,8 +467,7 @@ void preprocessing(
           c_ptr--;
         }
       }
-
-      }
+    }
     
     // auto end4 = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double> elapsed4 = end4 - start4;
