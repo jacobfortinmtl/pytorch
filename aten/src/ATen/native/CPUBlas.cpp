@@ -307,6 +307,7 @@ void preprocessing(
       nan_threshold = std::stof(env_threshold);
     }
     bool* col_to_remove = new bool[*m];
+    double* col_mean = new double[*m];
     int cols_removed = 0;
     int nan_count = 0;
     int new_m = *m;
@@ -326,23 +327,25 @@ void preprocessing(
     */
     // Adding time counters
     // auto start = std::chrono::high_resolution_clock::now();
-    #pragma omp parallel for reduction(+:cols_removed) private (nan_count)
+    int sum = 0;
+    #pragma omp parallel for reduction(+:cols_removed) private (nan_count, sum)
     for (int i = 0; i < *m; ++i) {
-        nan_count = 0;
-        col_to_remove[i] = false;
-        // std::cout << "Checking window: " << i << ", Elements: ";
-        for (int j = 0; j < *k; ++j) { // k is num elements in the window
-          // std::cout << a[j * (*lda) + i] << " ";
-          if (std::isnan(a[j * (*lda) + i])) {
-              nan_count++;
-              if (nan_count > (nan_threshold * static_cast<float>(*k))) {
-                  col_to_remove[i] = true;
-                  cols_removed++;
-                  break;
-              }
-          }
+      sum = 0;
+      nan_count = 0;
+      col_to_remove[i] = false;
+      // std::cout << "Checking window: " << i << ", Elements: ";
+      for (int j = 0; j < *k; ++j) { // k is num elements in the window
+        sum += std::isnan(a[j * (*lda) + i]) ? 0: a[j * (*lda) + i];
+        if (std::isnan(a[j * (*lda) + i])) {
+            nan_count++;
+            if (nan_count > (nan_threshold * static_cast<float>(*k))) {
+                col_to_remove[i] = true;
+                cols_removed++;
+                break;
+            }
         }
-        // std::cout << std::endl;
+      }
+      col_mean[i] = sum / (*k - nan_count);
     }
     // auto end = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double> elapsed = end - start;
@@ -371,7 +374,7 @@ void preprocessing(
       if (new_index[i] != -1) {
         for (int j = 0; j < *k; ++j) {
           // checking if we're inserting NaNs
-          new_a[new_index[i] + j * new_m] = std::isnan(a[i + j * (*lda)]) ? 0 : a[i + j * (*lda)];
+          new_a[new_index[i] + j * new_m] = std::isnan(a[i + j * (*lda)]) ? col_mean[i] : a[i + j * (*lda)];
         }
       }
     }

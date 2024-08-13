@@ -72,7 +72,7 @@ weight = torch.ones(1*batches, 1*channels, 2, 2).float()
 # Apply the convolution operation
 print("Size: ", sqrt_size**2)
 start_time = time.time()
-output_tensor = F.conv2d(input_tensor, weight, padding=0)
+output_tensor = F.conv2d(input_tensor, weight, padding=1)
 end_time = time.time()
 elapsed_time = end_time - start_time
 
