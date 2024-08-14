@@ -301,7 +301,7 @@ void preprocessing(
 
 
     // Get threshold from environment variable
-    float nan_threshold = 0.50; // defaults to 2
+    float nan_threshold = 0.75;
     char* env_threshold = std::getenv("THRESHOLD");
     if (env_threshold != NULL){
       nan_threshold = std::stof(env_threshold);
@@ -338,7 +338,7 @@ void preprocessing(
         sum += std::isnan(a[j * (*lda) + i]) ? 0: a[j * (*lda) + i];
         if (std::isnan(a[j * (*lda) + i])) {
             nan_count++;
-            if (nan_count > (nan_threshold * static_cast<float>(*k))) {
+            if (nan_count >= (nan_threshold * static_cast<float>(*k))) {
                 col_to_remove[i] = true;
                 cols_removed++;
                 break;
