@@ -345,7 +345,12 @@ void preprocessing(
             }
         }
       }
-      col_mean[i] = sum / (*k - nan_count);
+      if (*k - nan_count == 0) {
+        col_mean[i] = 0;
+      } 
+      else {
+          col_mean[i] = sum / (*k - nan_count);
+      }
     }
     // auto end = std::chrono::high_resolution_clock::now();
     // std::chrono::duration<double> elapsed = end - start;

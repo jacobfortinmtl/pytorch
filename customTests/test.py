@@ -54,10 +54,11 @@ num_nans = int(size * 1)
 
 # Create a random permutation of the indices
 indices = torch.randperm(size)
-input_tensor = torch.arange(1, size*channels*batches + 1).float()
+# input_tensor = torch.arange(1, size*channels*batches + 1).float()
+input_tensor = torch.zeros(1*batches, 1*channels, sqrt_size, sqrt_size).float()
 
 # Reshape the tensor to the desired shape
-input_tensor = input_tensor.reshape(1*batches, 1*channels, sqrt_size, sqrt_size)
+# input_tensor = input_tensor.reshape(1*batches, 1*channels, sqrt_size, sqrt_size)
 
 # Set the elements at the indices to NaN for each channel
 for c in range(input_tensor.shape[1]):
