@@ -50,7 +50,7 @@ batches = 1
 size = 4**2
 sqrt_size = int(math.sqrt(size))
 # Determine how many elements should be NaN
-num_nans = int(size * 1)
+num_nans = int(size * 0.33)
 
 # Create a random permutation of the indices
 indices = torch.randperm(size)

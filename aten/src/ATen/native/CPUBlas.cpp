@@ -482,7 +482,10 @@ void preprocessing(
     // std::cout << "Time taken to re-insert NaNs: " << elapsed4.count() << "s" << std::endl;
     // std::cout << std::endl;
     // std::cout << "Number of initial windows: " << old_m << std::endl;
-    // std::cout << "Convolutions skipped removed: " << cols_removed<< std::endl;
+    const char* env_p = std::getenv("SKIPPED");
+    if (env_p != nullptr && std::string(env_p) == "1") {
+        std::cout << "Convolutions skipped removed: " << cols_removed << std::endl;
+    }
     delete[] new_a;
     delete[] new_index;
     delete[] col_to_remove;
